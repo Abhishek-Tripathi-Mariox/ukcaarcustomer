@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAppSelector } from '@/store/hooks';
+import { SavedAddress } from '@/services/authService';
 
 /**
  * Default pickup resolver for the customer Home screen.
@@ -22,7 +23,7 @@ export type DefaultPickup = {
 export function useDefaultPickup(): DefaultPickup {
   const live = useLiveLocation({ watch: true, reverseGeocode: true });
   const savedAddresses = useAppSelector(
-    (state: any) => state.auth?.user?.savedAddresses ?? [],
+    (state) => state.auth?.user?.savedAddresses ?? [],
   );
 
   return useMemo<DefaultPickup>(() => {
@@ -41,7 +42,7 @@ export function useDefaultPickup(): DefaultPickup {
     // 2. Saved address — primary first, else first entry.
     if (savedAddresses.length > 0) {
       const primary =
-        savedAddresses.find((a: any) => a?.isPrimary) ?? savedAddresses[0];
+        savedAddresses.find((a: SavedAddress) => a?.isPrimary) ?? savedAddresses[0];
       if (
         primary?.address &&
         typeof primary.lat === 'number' &&
@@ -61,6 +62,7 @@ export function useDefaultPickup(): DefaultPickup {
 
     // 3. Nothing.
     return { source: 'none', location: null };
+  // savedAddresses is intentionally listed: RTK produces a new array reference whenever content changes, so the memo updates correctly.
   }, [
     live.coords?.lat,
     live.coords?.lng,

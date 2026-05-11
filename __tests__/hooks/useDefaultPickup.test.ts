@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook } from '@testing-library/react-native';
 import { useDefaultPickup } from '../../src/hooks/useDefaultPickup';
 
 // Mock the dependencies. Each test sets the return values it needs.

@@ -93,4 +93,16 @@ describe('useDefaultPickup', () => {
     expect(result.current.source).toBe('saved');
     expect(result.current.location).toEqual({ address: 'Home', lat: 3, lng: 3 });
   });
+
+  it("treats lat:0, lng:0 saved addresses as having no valid coords (returns 'none' or next saved)", () => {
+    mockUseLive.mockReturnValue({ coords: null, address: null });
+    mockSelector([
+      { address: 'Legacy primary', lat: 0, lng: 0, isPrimary: true, label: 'Home', icon: 'home' },
+    ]);
+
+    const { result } = renderHook(() => useDefaultPickup());
+    // Zero coords means we don't have a usable pickup from saved addresses.
+    expect(result.current.source).toBe('none');
+    expect(result.current.location).toBeNull();
+  });
 });

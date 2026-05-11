@@ -45,7 +45,8 @@ export function useDefaultPickup(): DefaultPickup {
       if (
         primary?.address &&
         typeof primary.lat === 'number' &&
-        typeof primary.lng === 'number'
+        typeof primary.lng === 'number' &&
+        (primary.lat !== 0 || primary.lng !== 0)
       ) {
         return {
           source: 'saved',

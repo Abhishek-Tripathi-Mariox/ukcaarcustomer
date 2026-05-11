@@ -134,8 +134,6 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
 
   const handleSelectPlace = (place: RecentPlace) => {
     setDropoffText(place.name);
-    // Prefer seeded coords (from HomeScreen) when the user hasn't edited
-    // the pickup; fall back to the live fix otherwise.
     // Prefer seeded coords from HomeScreen until the user types over the
     // pickup field. Manual edits should switch us to the live fix.
     const pickupLat = !pickupEditedByUser && seededCoords ? seededCoords.lat : currentLat;

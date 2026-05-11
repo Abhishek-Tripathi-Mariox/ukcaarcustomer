@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -106,6 +106,13 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
   const [pickupFocused, setPickupFocused] = useState(false);
   const [dropoffFocused, setDropoffFocused] = useState(false);
 
+  const dropoffInputRef = useRef<TextInput | null>(null);
+  // Set when we programmatically focus the dropoff input on mount (because
+  // pickup was pre-filled from HomeScreen). Consumed by the dropoff onFocus
+  // handler to skip the auto-navigate to SearchRide exactly once, so the
+  // user can interact with this screen rather than being yanked forward.
+  const suppressNextDropoffAutoNav = useRef(false);
+
   // Auto-fill pickup with the live reverse-geocoded address until the user
   // edits the field manually.
   useEffect(() => {
@@ -113,6 +120,25 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
       setPickupText(live.address);
     }
   }, [live.address, pickupProtected]);
+
+  // When HomeScreen pre-filled the pickup, the user usually wants to type the
+  // destination next. Focus the dropoff field on mount so the keyboard opens
+  // ready for that — but only if the dropoff is currently empty so we don't
+  // hijack focus when the user came back to edit something.
+  useEffect(() => {
+    if (!seededInitial) return;
+    if (dropoffText) return;
+    // Slight delay so the screen transition completes before focusing —
+    // RN can drop focus calls fired during the navigation animation.
+    const t = setTimeout(() => {
+      suppressNextDropoffAutoNav.current = true;
+      dropoffInputRef.current?.focus();
+    }, 250);
+    return () => clearTimeout(t);
+    // We deliberately depend only on seededInitial; if the user clears the
+    // dropoff later we don't want to re-focus mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentLat = live.coords?.lat ?? FALLBACK_PICKUP.lat;
   const currentLng = live.coords?.lng ?? FALLBACK_PICKUP.lng;
@@ -300,6 +326,7 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
               <Ionicons name="location" size={18} color={Colors.dropoffRed} />
             </View>
             <TextInput
+              ref={dropoffInputRef}
               style={styles.inputText}
               value={dropoffText}
               onChangeText={setDropoffText}
@@ -307,6 +334,10 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
               placeholderTextColor={Colors.textMuted}
               onFocus={() => {
                 setDropoffFocused(true);
+                if (suppressNextDropoffAutoNav.current) {
+                  suppressNextDropoffAutoNav.current = false;
+                  return;
+                }
                 navigation.navigate('SearchRide');
               }}
               selectionColor={Colors.primary}

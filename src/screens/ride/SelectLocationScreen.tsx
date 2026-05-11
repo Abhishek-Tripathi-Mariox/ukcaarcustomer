@@ -84,13 +84,19 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
   const [pickupText, setPickupText] = useState(
     seededInitial?.address || route.params?.pickup || FALLBACK_PICKUP.address,
   );
-  // Treat both legacy string `pickup` and the new `initialPickup` as "the
-  // user has provided a value, don't overwrite it from live GPS".
-  const [pickupTouched, setPickupTouched] = useState(
+  // Two separate concerns that used to share one flag:
+  //  - pickupProtected: "do not let live-GPS auto-fill overwrite the
+  //    current text". True whenever a caller seeded a value OR the user
+  //    has typed something.
+  //  - pickupEditedByUser: "the user typed into the pickup field". Only
+  //    used to decide whether handleSelectPlace falls back from the
+  //    seeded coords to the live-GPS fix.
+  const [pickupProtected, setPickupProtected] = useState(
     !!seededInitial || !!route.params?.pickup,
   );
-  // Cache the seeded coords so handleSelectPlace / handleBookNow can use
-  // real lat/lng instead of falling back to the live fix.
+  const [pickupEditedByUser, setPickupEditedByUser] = useState(false);
+  // Cache the seeded coords so handleSelectPlace can use real lat/lng
+  // instead of falling back to the live fix.
   const [seededCoords] = useState<{ lat: number; lng: number } | null>(
     seededInitial
       ? { lat: seededInitial.lat, lng: seededInitial.lng }
@@ -103,10 +109,10 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
   // Auto-fill pickup with the live reverse-geocoded address until the user
   // edits the field manually.
   useEffect(() => {
-    if (!pickupTouched && live.address) {
+    if (!pickupProtected && live.address) {
       setPickupText(live.address);
     }
-  }, [live.address, pickupTouched]);
+  }, [live.address, pickupProtected]);
 
   const currentLat = live.coords?.lat ?? FALLBACK_PICKUP.lat;
   const currentLng = live.coords?.lng ?? FALLBACK_PICKUP.lng;
@@ -130,8 +136,10 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
     setDropoffText(place.name);
     // Prefer seeded coords (from HomeScreen) when the user hasn't edited
     // the pickup; fall back to the live fix otherwise.
-    const pickupLat = !pickupTouched && seededCoords ? seededCoords.lat : currentLat;
-    const pickupLng = !pickupTouched && seededCoords ? seededCoords.lng : currentLng;
+    // Prefer seeded coords from HomeScreen until the user types over the
+    // pickup field. Manual edits should switch us to the live fix.
+    const pickupLat = !pickupEditedByUser && seededCoords ? seededCoords.lat : currentLat;
+    const pickupLng = !pickupEditedByUser && seededCoords ? seededCoords.lng : currentLng;
     dispatch(setPickup({ address: pickupText, lat: pickupLat, lng: pickupLng }));
     dispatch(setDropoff({ address: place.address, lat: place.lat, lng: place.lng }));
     navigation.navigate('SelectRide', {
@@ -259,7 +267,8 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
               value={pickupText}
               onChangeText={(t) => {
                 setPickupText(t);
-                setPickupTouched(true);
+                setPickupProtected(true);
+                setPickupEditedByUser(true);
               }}
               placeholder="Your current location"
               placeholderTextColor={Colors.textMuted}
@@ -270,7 +279,8 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
             <TouchableOpacity
               style={styles.gpsButton}
               onPress={() => {
-                setPickupTouched(false);
+                setPickupProtected(false);
+                setPickupEditedByUser(false);
                 live.refresh();
               }}
               disabled={live.loading}

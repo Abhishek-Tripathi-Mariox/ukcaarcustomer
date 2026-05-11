@@ -80,17 +80,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     dispatch(setRideType(activeTab));
   }, [activeTab, dispatch]);
 
-  // Default the Scheduled-tab pickup field to the user's primary saved address
-  // (or the first saved one) — only while the field is empty so we never
-  // clobber what the user typed.
+  // Default the Scheduled-tab pickup field to the resolved default location
+  // (live GPS → primary saved → first saved) — only while the field is empty
+  // so we never clobber what the user typed.
   useEffect(() => {
     if (scheduledPickup) return;
-    const list = user?.savedAddresses ?? [];
-    if (list.length === 0) return;
-    const primary = list.find((a) => a.isPrimary) ?? list[0];
-    if (primary?.address) setScheduledPickup(primary.address);
+    const addr = defaultPickup.location?.address;
+    if (addr) setScheduledPickup(addr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.savedAddresses]);
+  }, [defaultPickup.location?.address]);
 
   // ── Live nearby drivers for the map ─────────────────────────────
   // Center coords for the static-map projection. Falls back to a Dehradun-ish

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,25 @@ import {
   FlatList,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import MapView, {
+  Marker,
+  PROVIDER_GOOGLE,
+  Region,
+} from 'react-native-maps';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+// MaterialCommunityIcons removed with the static car-icon placeholder; the
+// real react-native-maps Markers now render live cab positions.
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius, Shadow } from '@/theme';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setPickup, setDropoff } from '@/store/slices/rideSlice';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
+import { driverService, NearbyDriver } from '@/services/driverService';
+import { rideService } from '@/services/rideService';
+import { geoService } from '@/services/geoService';
+import { CabIcon } from '@/components/icons/HomeIcons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,17 +58,30 @@ interface RecentPlace {
   id: string;
   name: string;
   address: string;
-  distance: string;
+  /** 'saved' = address book (Home/Work/etc), 'recent' = past ride drop-off. */
+  source: 'saved' | 'recent';
+  /** Optional Ionicons name to render in the row. */
+  icon?: string;
+  /** Distance from the rider's current GPS, in km. Computed at render time. */
+  distanceKm?: number;
   lat: number;
   lng: number;
 }
 
-const recentPlaces: RecentPlace[] = [
-  { id: '1', name: 'Office', address: 'Sector 62, Noida, UP 201301', distance: '2.7km', lat: 28.6270, lng: 77.3650 },
-  { id: '2', name: 'Coffee shop', address: 'Connaught Place, New Delhi 110001', distance: '1.1km', lat: 28.6315, lng: 77.2167 },
-  { id: '3', name: 'Shopping center', address: 'Select Citywalk, Saket, New Delhi', distance: '4.9km', lat: 28.5285, lng: 77.2190 },
-  { id: '4', name: 'Gym', address: 'Gold Gym, Nehru Place, New Delhi', distance: '3.5km', lat: 28.5491, lng: 77.2533 },
-];
+const haversineKm = (
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number => {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
 
 // Last-resort coordinates if GPS is denied or unavailable.
 const FALLBACK_PICKUP = {
@@ -143,6 +167,148 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
   const currentLat = live.coords?.lat ?? FALLBACK_PICKUP.lat;
   const currentLng = live.coords?.lng ?? FALLBACK_PICKUP.lng;
 
+  // Real map viewport — locked to ~5 km diameter around the rider, same
+  // scale the Home screen uses so the cab markers feel continuous between
+  // the two screens.
+  const RADIUS_KM = 5;
+  const mapRegion: Region = useMemo(() => {
+    const latDelta = (RADIUS_KM * 2) / 111;
+    const lngDelta =
+      (RADIUS_KM * 2) /
+      (111 * Math.cos((currentLat * Math.PI) / 180) || 111);
+    return {
+      latitude: currentLat,
+      longitude: currentLng,
+      latitudeDelta: latDelta,
+      longitudeDelta: lngDelta,
+    };
+  }, [currentLat, currentLng]);
+
+  // ── Pick-on-map mode (honors route.params.pickFromMap) ──
+  // When on, the map becomes pannable, a fixed center pin appears, and a
+  // confirm button reverse-geocodes the map centre into the drop-off.
+  const [mapPickMode, setMapPickMode] = useState(!!route.params?.pickFromMap);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({
+    lat: currentLat,
+    lng: currentLng,
+  });
+  const [confirmingPin, setConfirmingPin] = useState(false);
+
+  const handleConfirmMapPin = async () => {
+    setConfirmingPin(true);
+    try {
+      const res = await geoService.reverse(mapCenter.lat, mapCenter.lng);
+      const address =
+        res?.address ||
+        res?.displayName ||
+        `Pinned location (${mapCenter.lat.toFixed(5)}, ${mapCenter.lng.toFixed(5)})`;
+      const name = address.split(',')[0] || 'Selected location';
+      const pickupLat = !pickupEditedByUser && seededCoords ? seededCoords.lat : currentLat;
+      const pickupLng = !pickupEditedByUser && seededCoords ? seededCoords.lng : currentLng;
+      dispatch(setPickup({ address: pickupText, lat: pickupLat, lng: pickupLng }));
+      dispatch(setDropoff({ address, lat: mapCenter.lat, lng: mapCenter.lng }));
+      navigation.navigate('SelectRide', { pickup: pickupText, dropoff: name, dropoffAddress: address });
+    } catch {
+      /* leave the user on the map to retry */
+    } finally {
+      setConfirmingPin(false);
+    }
+  };
+
+  // Live nearby drivers — same poll the Home and SelectRide screens use so
+  // the cabs shown here move with the dispatcher's live index.
+  const [nearbyDrivers, setNearbyDrivers] = useState<NearbyDriver[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchDrivers = async () => {
+      try {
+        const list = await driverService.getNearby(currentLat, currentLng, 8);
+        if (!cancelled) setNearbyDrivers(list);
+      } catch {
+        /* keep last list */
+      }
+    };
+    fetchDrivers();
+    const t = setInterval(fetchDrivers, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [currentLat, currentLng]);
+
+  // Recent places = (1) the user's saved addresses (Home/Work/etc) + (2) the
+  // last few unique drop-offs from their ride history. The hardcoded Delhi
+  // demo list is gone; if the user has neither, we show an empty-state
+  // hint instead of fake content.
+  const savedAddressPlaces: RecentPlace[] = useMemo(() => {
+    const list = user?.savedAddresses ?? [];
+    return list
+      .filter(a => a.address && (a.lat !== 0 || a.lng !== 0))
+      .map((a, idx) => {
+        const dKm = haversineKm(
+          { lat: currentLat, lng: currentLng },
+          { lat: a.lat, lng: a.lng },
+        );
+        return {
+          id: `saved-${idx}-${(a.label || 'addr').toLowerCase()}`,
+          name: a.label || a.address,
+          address: a.address,
+          source: 'saved' as const,
+          icon: (a.icon as string) || 'location',
+          distanceKm: dKm,
+          lat: a.lat,
+          lng: a.lng,
+        };
+      });
+  }, [user?.savedAddresses, currentLat, currentLng]);
+
+  const [recentRideDropoffs, setRecentRideDropoffs] = useState<RecentPlace[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await rideService.getRides(1, 20);
+        const rides: Array<{ dropoff?: { address: string; lat: number; lng: number } }> =
+          (data as any)?.rides || (data as any)?.items || [];
+        const seen = new Set<string>();
+        const list: RecentPlace[] = [];
+        for (const r of rides) {
+          const d = r?.dropoff;
+          if (!d?.address) continue;
+          const key = d.address.trim().toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          list.push({
+            id: `recent-${list.length}-${key.slice(0, 12)}`,
+            name: d.address.split(',')[0] || d.address,
+            address: d.address,
+            source: 'recent',
+            icon: 'time-outline',
+            distanceKm: haversineKm(
+              { lat: currentLat, lng: currentLng },
+              { lat: d.lat, lng: d.lng },
+            ),
+            lat: d.lat,
+            lng: d.lng,
+          });
+          if (list.length >= 5) break;
+        }
+        if (!cancelled) setRecentRideDropoffs(list);
+      } catch {
+        if (!cancelled) setRecentRideDropoffs([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Re-compute distance when GPS lands. Address list itself doesn't change.
+  }, [currentLat, currentLng]);
+
+  const recentPlaces: RecentPlace[] = useMemo(
+    () => [...savedAddressPlaces, ...recentRideDropoffs],
+    [savedAddressPlaces, recentRideDropoffs],
+  );
+
   const firstName = user?.firstName || 'User';
 
   const greeting = (() => {
@@ -210,44 +376,79 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
         </View>
       </View>
 
-      {/* ── Map Area ── */}
+      {/* ── Real Google Map — same scale/markers as the Home screen ── */}
       <View style={[styles.mapContainer, { top: insets.top + 90 }]}>
-        <View style={styles.mapPlaceholder}>
-          {/* Map terrain patches */}
-          <View style={[styles.mapPatch, { top: '10%', left: '5%', width: 80, height: 50, backgroundColor: Colors.mapSand, borderRadius: 20 }]} />
-          <View style={[styles.mapPatch, { top: '55%', right: '10%', width: 100, height: 40, backgroundColor: Colors.mapSand, borderRadius: 16 }]} />
-          <View style={[styles.mapPatch, { top: '20%', left: '55%', width: 60, height: 70, backgroundColor: Colors.mapGreen, borderRadius: 30, opacity: 0.4 }]} />
-          <View style={[styles.mapPatch, { top: '40%', left: '10%', width: 50, height: 50, backgroundColor: Colors.mapGreen, borderRadius: 25, opacity: 0.3 }]} />
-          <View style={[styles.mapPatch, { bottom: '10%', right: '25%', width: 70, height: 35, backgroundColor: Colors.mapWater, borderRadius: 18, opacity: 0.3 }]} />
-
-          <View style={styles.mapGrid}>
-            {Array.from({ length: 14 }).map((_, i) => (
-              <View key={`h${i}`} style={[styles.mapLineH, { top: i * 35 }]} />
+        <MapView
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+          style={StyleSheet.absoluteFill}
+          initialRegion={mapRegion}
+          // In pick mode the map is free-pannable (no controlled region) so the
+          // rider can drag the centre pin to their drop-off.
+          region={mapPickMode ? undefined : mapRegion}
+          onRegionChangeComplete={
+            mapPickMode
+              ? (r) => setMapCenter({ lat: r.latitude, lng: r.longitude })
+              : undefined
+          }
+          showsUserLocation
+          showsMyLocationButton={false}
+          showsCompass={false}
+          toolbarEnabled={false}
+        >
+          {nearbyDrivers
+            .filter(
+              d =>
+                d.location &&
+                typeof d.location.lat === 'number' &&
+                typeof d.location.lng === 'number',
+            )
+            .map(d => (
+              <Marker
+                key={d.id}
+                coordinate={{ latitude: d.location.lat, longitude: d.location.lng }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                flat
+                tracksViewChanges={false}
+              >
+                <CabIcon size={28} rotation={0} />
+              </Marker>
             ))}
-            {Array.from({ length: 12 }).map((_, i) => (
-              <View key={`v${i}`} style={[styles.mapLineV, { left: i * 35 }]} />
-            ))}
-          </View>
+        </MapView>
 
-          {/* Cab badge */}
-          <View style={styles.cabBadge}>
+        {!mapPickMode && (
+          <View pointerEvents="none" style={styles.cabBadge}>
             <Ionicons name="flash" size={12} color="#F7F7F7" />
-            <Text style={styles.cabBadgeText}>Get a cab in 5 mins</Text>
+            <Text style={styles.cabBadgeText}>
+              {nearbyDrivers.length > 0
+                ? `${nearbyDrivers.length} cab${nearbyDrivers.length === 1 ? '' : 's'} nearby`
+                : 'Looking for nearby cabs…'}
+            </Text>
           </View>
+        )}
 
-          {/* Location marker */}
-          <View style={styles.locationMarker}>
-            <View style={styles.locationPulse} />
-            <View style={styles.locationDot} />
-          </View>
-
-          {/* Car markers */}
-          <MaterialCommunityIcons name="car-side" size={22} color="#2C3E50" style={[styles.carIcon, { top: '20%', left: '20%', transform: [{ rotate: '30deg' }] }]} />
-          <MaterialCommunityIcons name="car-side" size={22} color="#2C3E50" style={[styles.carIcon, { top: '15%', left: '65%', transform: [{ rotate: '-20deg' }] }]} />
-          <MaterialCommunityIcons name="car-side" size={20} color="#34495E" style={[styles.carIcon, { top: '40%', left: '75%', transform: [{ rotate: '45deg' }] }]} />
-          <MaterialCommunityIcons name="car-side" size={18} color="#2C3E50" style={[styles.carIcon, { top: '55%', left: '35%', transform: [{ rotate: '-10deg' }] }]} />
-          <MaterialCommunityIcons name="car-side" size={20} color="#34495E" style={[styles.carIcon, { top: '30%', left: '45%', transform: [{ rotate: '60deg' }] }]} />
-        </View>
+        {/* Pick-on-map: fixed centre pin + confirm bar */}
+        {mapPickMode && (
+          <>
+            <View pointerEvents="none" style={styles.centerPin}>
+              <Ionicons name="location" size={40} color={Colors.dropoffRed} />
+            </View>
+            <View pointerEvents="none" style={styles.mapHint}>
+              <Text style={styles.mapHintText}>Move the map to set your drop-off</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.mapConfirmBtn}
+              onPress={handleConfirmMapPin}
+              disabled={confirmingPin}
+              activeOpacity={0.85}
+            >
+              {confirmingPin ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <Text style={styles.mapConfirmText}>Confirm drop-off here</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* ── Bottom Sheet ── */}
@@ -342,35 +543,85 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
               }}
               selectionColor={Colors.primary}
             />
+            <TouchableOpacity
+              style={styles.gpsButton}
+              onPress={() => setMapPickMode((m) => !m)}
+              accessibilityLabel="Pick drop-off on map"
+            >
+              <Ionicons
+                name={mapPickMode ? 'close' : 'map'}
+                size={20}
+                color={Colors.primary}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Recent Places */}
+        {/* Saved + recent places. We deliberately don't expose a Clear-All
+            here: saved addresses live on the user profile and recent ride
+            drop-offs come from server-side history — neither is local
+            state we own to wipe. */}
         <View style={styles.recentHeader}>
-          <Text style={styles.recentTitle}>Recent places</Text>
-          <TouchableOpacity>
-            <Text style={styles.clearAll}>Clear All</Text>
-          </TouchableOpacity>
+          <Text style={styles.recentTitle}>
+            {recentPlaces.length > 0 ? 'Recent places' : 'Saved & recent places'}
+          </Text>
         </View>
 
         <FlatList
           data={recentPlaces}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.placeRow} onPress={() => handleSelectPlace(item)} activeOpacity={0.7}>
-              <View style={styles.placeIconCircle}>
-                <Ionicons name="time-outline" size={18} color={Colors.textSecondary} />
+          keyExtractor={item => item.id}
+          renderItem={({ item, index }) => {
+            // Tiny section headers so saved addresses don't blur into
+            // ride-history drop-offs visually.
+            const prev = recentPlaces[index - 1];
+            const showSavedHeader =
+              item.source === 'saved' && prev?.source !== 'saved';
+            const showRecentHeader =
+              item.source === 'recent' && prev?.source !== 'recent';
+            return (
+              <View>
+                {showSavedHeader && (
+                  <Text style={styles.sectionHeader}>Saved addresses</Text>
+                )}
+                {showRecentHeader && (
+                  <Text style={styles.sectionHeader}>Recent drop-offs</Text>
+                )}
+                <TouchableOpacity
+                  style={styles.placeRow}
+                  onPress={() => handleSelectPlace(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.placeIconCircle}>
+                    <Ionicons
+                      name={(item.icon as any) || 'location'}
+                      size={18}
+                      color={Colors.textSecondary}
+                    />
+                  </View>
+                  <View style={styles.placeInfo}>
+                    <Text style={styles.placeName}>{item.name}</Text>
+                    <Text style={styles.placeAddress} numberOfLines={1}>
+                      {item.address}
+                    </Text>
+                  </View>
+                  {Number.isFinite(item.distanceKm) && (
+                    <Text style={styles.placeDistance}>
+                      {(item.distanceKm as number).toFixed(1)} km
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
-              <View style={styles.placeInfo}>
-                <Text style={styles.placeName}>{item.name}</Text>
-                <Text style={styles.placeAddress} numberOfLines={1}>{item.address}</Text>
-              </View>
-              <Text style={styles.placeDistance}>{item.distance}</Text>
-            </TouchableOpacity>
-          )}
+            );
+          }}
           showsVerticalScrollIndicator={false}
           style={styles.placesList}
           contentContainerStyle={{ paddingBottom: 8 }}
+          ListEmptyComponent={
+            <Text style={styles.emptyPlaces}>
+              No saved or recent places yet. Pick a destination in the field
+              above to start your trip.
+            </Text>
+          }
         />
 
         {/* Book Now Button */}
@@ -457,15 +708,15 @@ const styles = StyleSheet.create({
   },
 
   /* ── Map ── */
+  // Inline `top` is set from insets to clear the teal header; `bottom`
+  // pins the map to the top edge of the bottom sheet. The result gives
+  // the MapView a concrete rectangle so the StyleSheet.absoluteFill inside
+  // it has something to fill.
   mapContainer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: height * 0.55,
-  },
-  mapPlaceholder: {
-    flex: 1,
-    minHeight: height * 0.22,
     backgroundColor: Colors.mapBackground,
     overflow: 'hidden',
   },
@@ -503,6 +754,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 15,
     color: Colors.white,
+  },
+  centerPin: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    // Lift the pin so its tip (not its centre) marks the spot.
+    marginTop: -40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapHint: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  mapHintText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  mapConfirmBtn: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 14,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.teal,
+  },
+  mapConfirmText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   locationMarker: {
     position: 'absolute',
@@ -666,6 +958,23 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.primary,
     lineHeight: 16,
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  emptyPlaces: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    lineHeight: 18,
   },
   placesList: {
     flexGrow: 0,

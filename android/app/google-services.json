@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "712887070437",
+    "project_id": "ukcaar-f7639",
+    "storage_bucket": "ukcaar-f7639.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:712887070437:android:174c21b6ed683b5f8d6e0c",
+        "android_client_info": {
+          "package_name": "com.ukcaar.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1y7H1Z9lcTOmMi2wRe7dnImMQRM15VZQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,44 +1,40 @@
 import { renderHook } from '@testing-library/react-native';
-import { useDefaultPickup } from '../../src/hooks/useDefaultPickup';
+import { useDefaultPickup, LiveLocationLike } from '../../src/hooks/useDefaultPickup';
 
-// Mock the dependencies. Each test sets the return values it needs.
-jest.mock('@/hooks/useLiveLocation', () => ({
-  useLiveLocation: jest.fn(),
-}));
+// useDefaultPickup no longer subscribes to GPS itself — the caller hands
+// it the live state. We only need to mock the Redux selector here.
 jest.mock('@/store/hooks', () => ({
   useAppSelector: jest.fn(),
 }));
 
-import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAppSelector } from '@/store/hooks';
 
-const mockUseLive = useLiveLocation as jest.Mock;
 const mockUseSel = useAppSelector as jest.Mock;
 
 function mockSelector(savedAddresses: any[]) {
-  // The hook calls useAppSelector(state => state.auth.user). Return a
-  // shaped user object when the selector is invoked.
   mockUseSel.mockImplementation((sel: any) =>
     sel({ auth: { user: { savedAddresses } } }),
   );
 }
 
+const liveOf = (
+  coords: LiveLocationLike['coords'],
+  address: LiveLocationLike['address'],
+): LiveLocationLike => ({ coords, address });
+
 describe('useDefaultPickup', () => {
   beforeEach(() => {
-    mockUseLive.mockReset();
     mockUseSel.mockReset();
   });
 
   it("returns source='gps' when live coords + address are available", () => {
-    mockUseLive.mockReturnValue({
-      coords: { lat: 30.3165, lng: 78.0322 },
-      address: '123 Main Rd, Dehradun',
-    });
     mockSelector([
       { address: 'Home addr', lat: 1, lng: 1, isPrimary: true, label: 'Home', icon: 'home' },
     ]);
 
-    const { result } = renderHook(() => useDefaultPickup());
+    const { result } = renderHook(() =>
+      useDefaultPickup(liveOf({ lat: 30.3165, lng: 78.0322 }, '123 Main Rd, Dehradun')),
+    );
     expect(result.current.source).toBe('gps');
     expect(result.current.location).toEqual({
       address: '123 Main Rd, Dehradun',
@@ -48,61 +44,70 @@ describe('useDefaultPickup', () => {
   });
 
   it("returns source='saved' (primary) when GPS is missing", () => {
-    mockUseLive.mockReturnValue({ coords: null, address: null });
     mockSelector([
       { address: 'Work', lat: 2, lng: 2, isPrimary: false, label: 'Work', icon: 'briefcase' },
       { address: 'Home', lat: 3, lng: 3, isPrimary: true, label: 'Home', icon: 'home' },
     ]);
 
-    const { result } = renderHook(() => useDefaultPickup());
+    const { result } = renderHook(() => useDefaultPickup(liveOf(null, null)));
     expect(result.current.source).toBe('saved');
     expect(result.current.location).toEqual({ address: 'Home', lat: 3, lng: 3 });
   });
 
   it("returns source='saved' (first) when no primary exists", () => {
-    mockUseLive.mockReturnValue({ coords: null, address: null });
     mockSelector([
       { address: 'Work', lat: 2, lng: 2, isPrimary: false, label: 'Work', icon: 'briefcase' },
     ]);
 
-    const { result } = renderHook(() => useDefaultPickup());
+    const { result } = renderHook(() => useDefaultPickup(liveOf(null, null)));
     expect(result.current.source).toBe('saved');
     expect(result.current.location).toEqual({ address: 'Work', lat: 2, lng: 2 });
   });
 
   it("returns source='none' when GPS is missing and no saved addresses", () => {
-    mockUseLive.mockReturnValue({ coords: null, address: null });
     mockSelector([]);
 
-    const { result } = renderHook(() => useDefaultPickup());
+    const { result } = renderHook(() => useDefaultPickup(liveOf(null, null)));
     expect(result.current.source).toBe('none');
     expect(result.current.location).toBeNull();
   });
 
   it("falls back to saved when GPS coords are present but reverse-geocode hasn't returned yet", () => {
-    mockUseLive.mockReturnValue({
-      coords: { lat: 30.3165, lng: 78.0322 },
-      address: null, // not geocoded yet
-    });
     mockSelector([
       { address: 'Home', lat: 3, lng: 3, isPrimary: true, label: 'Home', icon: 'home' },
     ]);
 
-    const { result } = renderHook(() => useDefaultPickup());
-    // Without an address string we don't surface a half-baked label.
+    const { result } = renderHook(() =>
+      useDefaultPickup(liveOf({ lat: 30.3165, lng: 78.0322 }, null)),
+    );
+    // Saved address beats a half-baked GPS hit (coords without address).
     expect(result.current.source).toBe('saved');
     expect(result.current.location).toEqual({ address: 'Home', lat: 3, lng: 3 });
   });
 
-  it("treats lat:0, lng:0 saved addresses as having no valid coords (returns 'none' or next saved)", () => {
-    mockUseLive.mockReturnValue({ coords: null, address: null });
+  it("treats lat:0, lng:0 saved addresses as having no valid coords (returns 'none')", () => {
     mockSelector([
       { address: 'Legacy primary', lat: 0, lng: 0, isPrimary: true, label: 'Home', icon: 'home' },
     ]);
 
-    const { result } = renderHook(() => useDefaultPickup());
-    // Zero coords means we don't have a usable pickup from saved addresses.
+    const { result } = renderHook(() => useDefaultPickup(liveOf(null, null)));
     expect(result.current.source).toBe('none');
     expect(result.current.location).toBeNull();
+  });
+
+  it("returns source='gps' with 'Current location' label when coords exist but no address AND no saved fallback", () => {
+    mockSelector([]);
+
+    const { result } = renderHook(() =>
+      useDefaultPickup(liveOf({ lat: 30.3165, lng: 78.0322 }, null)),
+    );
+    // No saved fallback; surface the coords so the pickup row isn't empty
+    // while reverse-geocoding is still in flight.
+    expect(result.current.source).toBe('gps');
+    expect(result.current.location).toEqual({
+      address: 'Current location',
+      lat: 30.3165,
+      lng: 78.0322,
+    });
   });
 });

@@ -117,7 +117,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
 
       const options = {
         description: `${scheduledRoute.name} • ${seats.length} seat${seats.length > 1 ? 's' : ''}`,
-        image: 'https://ukcaar.s3.amazonaws.com/logo.png',
+        image: 'https://ukcar.s3.ap-south-1.amazonaws.com/logo.png',
         currency,
         key: keyId,
         amount: Math.round(total * 100).toString(),

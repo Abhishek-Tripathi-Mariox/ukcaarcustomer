@@ -205,7 +205,7 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
       const { orderId, keyId, currency } = orderRes.data;
       const options = {
         description: `UKCAAR ride payment`,
-        image: 'https://ukcaar.s3.amazonaws.com/logo.png',
+        image: 'https://ukcar.s3.ap-south-1.amazonaws.com/logo.png',
         currency,
         key: keyId,
         amount: Math.round(totalFare * 100).toString(),

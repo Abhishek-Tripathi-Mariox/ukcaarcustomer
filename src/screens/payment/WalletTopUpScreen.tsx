@@ -218,7 +218,7 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
 
       const options = {
         description: 'UKCAAR Wallet Top-up',
-        image: 'https://ukcaar.s3.amazonaws.com/logo.png',
+        image: 'https://ukcar.s3.ap-south-1.amazonaws.com/logo.png',
         currency,
         key: keyId,
         // Server-computed amount in paise — keeps the charge in sync with the

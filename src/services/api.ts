@@ -21,10 +21,10 @@ const devHost =
     : LOCAL_IP;    // physical device on same Wi-Fi (Android or iOS) and iOS simulator
 
 export const BASE_URL = FORCE_PRODUCTION
-  ? 'https://backend.ukcaar.com/api/v1'
+  ? 'https://ukcaar.com/api/v1'
   : __DEV__
     ? `http://${devHost}:${PORT}/api/v1`
-    : 'https://backend.ukcaar.com/api/v1';
+    : 'https://ukcaar.com/api/v1';
 
 if (__DEV__) {
   // eslint-disable-next-line no-console

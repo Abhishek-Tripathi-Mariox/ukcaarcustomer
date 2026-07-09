@@ -40,6 +40,7 @@ import {
 } from '@/components/icons/HomeIcons';
 import { BookingRideForSheet } from './BookingRideForSheet';
 import { PickupPickerSheet } from './PickupPickerSheet';
+import { LocationRequiredBanner } from '@/components/LocationRequiredBanner';
 
 const pickupGif = require('../../../assets/home-screen/gifs/charging-station.gif');
 const dropGif = require('../../../assets/home-screen/gifs/location.gif');
@@ -677,6 +678,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Shown only when location permission is missing — gives the user a
+            one-tap way to allow it (or open Settings if blocked) instead of a
+            silently broken map. Rendered inside the absolute top bar so it
+            inherits its z-index and sits directly below the greeting row. */}
+        <LocationRequiredBanner />
       </View>
 
       {/* ── Map / Illustration Area ──

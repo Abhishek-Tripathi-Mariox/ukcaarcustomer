@@ -4,27 +4,31 @@ import { Platform } from 'react-native';
 
 // ── Config ──
 // Set to true to force production API even in dev mode (for testing on physical devices)
-const FORCE_PRODUCTION = false;
+const FORCE_PRODUCTION = true;
 
-// Your dev machine's LAN IP (used by physical devices on the same Wi-Fi).
-// Update this if your IP changes — `ipconfig` on Windows, `ifconfig` on macOS/Linux.
-const LOCAL_IP = '192.168.1.33';
+// Your dev machine's LAN IP — used ONLY by dev/USB (Metro) builds so a physical
+// device on the same Wi-Fi reaches the local backend. Release/prod APKs always
+// use the deployed backend (PRODUCTION_URL). Update if your IP changes —
+// `ipconfig` on Windows, `ifconfig`/`ip addr` on macOS/Linux.
+const LOCAL_IP = '192.168.1.34';
 // Set to true ONLY when running in the Android emulator (uses 10.0.2.2 → host loopback).
 // For physical Android/iOS devices and the iOS simulator, leave this false.
 const USE_ANDROID_EMULATOR = false;
 
 const PORT = 5000;
+const PRODUCTION_URL = 'https://ukcaar.com/api/v1';
 
 const devHost =
   Platform.OS === 'android' && USE_ANDROID_EMULATOR
     ? '10.0.2.2'   // Android emulator only
     : LOCAL_IP;    // physical device on same Wi-Fi (Android or iOS) and iOS simulator
 
+// Dev/USB build → local LAN backend; release build → deployed backend.
 export const BASE_URL = FORCE_PRODUCTION
-  ? 'https://ukcaar.com/api/v1'
+  ? PRODUCTION_URL
   : __DEV__
     ? `http://${devHost}:${PORT}/api/v1`
-    : 'https://ukcaar.com/api/v1';
+    : PRODUCTION_URL;
 
 if (__DEV__) {
   // eslint-disable-next-line no-console

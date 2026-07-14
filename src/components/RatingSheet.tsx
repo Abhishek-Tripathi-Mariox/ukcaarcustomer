@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OutlineStarIcon, RatingStarIcon } from '@/components/icons/PaymentSuccessIcons';
+import { Colors, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 
 interface RatingSheetProps {
   visible: boolean;
@@ -54,7 +56,7 @@ export const RatingSheet: React.FC<RatingSheetProps> = ({
           behavior="padding"
           style={styles.sheetWrap}
         >
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + vs(16) }]}>
             {/* Grab handle */}
             <View style={styles.handle} />
 
@@ -73,7 +75,7 @@ export const RatingSheet: React.FC<RatingSheetProps> = ({
               <View style={styles.driverInfo}>
                 <Text style={styles.driverName}>{driverName}</Text>
                 <View style={styles.ratingRow}>
-                  <OutlineStarIcon size={17} color="#F5A623" />
+                  <OutlineStarIcon size={s(17)} color="#F5A623" />
                   <Text style={styles.ratingText}>{driverRating}</Text>
                 </View>
               </View>
@@ -96,7 +98,7 @@ export const RatingSheet: React.FC<RatingSheetProps> = ({
                   activeOpacity={0.7}
                   style={styles.starButton}
                 >
-                  <RatingStarIcon size={44} filled={i <= rating} />
+                  <RatingStarIcon size={s(44)} filled={i <= rating} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -132,7 +134,7 @@ export const RatingSheet: React.FC<RatingSheetProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(65,65,65,0.5)',
+    backgroundColor: alpha('#414141', 0.5),
     justifyContent: 'flex-end',
   },
   backdropPress: {
@@ -142,123 +144,121 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   sheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: 22,
-    paddingTop: 10,
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: s(16),
+    borderTopRightRadius: s(16),
+    paddingHorizontal: s(22),
+    paddingTop: vs(10),
   },
   handle: {
     alignSelf: 'center',
-    width: 57,
-    height: 5,
-    borderRadius: 100,
-    backgroundColor: '#000000',
-    marginBottom: 18,
+    width: s(57),
+    height: vs(5),
+    borderRadius: s(100),
+    backgroundColor: Colors.textPrimary,
+    marginBottom: vs(18),
   },
   driverRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: vs(16),
   },
   avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: s(54),
+    height: s(54),
+    borderRadius: s(27),
     overflow: 'hidden',
-    backgroundColor: '#EEE',
+    backgroundColor: Colors.borderLight,
   },
   avatarImg: {
     width: '100%',
     height: '100%',
   },
   driverInfo: {
-    marginLeft: 15,
+    marginLeft: s(15),
   },
   driverName: {
     fontFamily: 'Inter-Bold',
-    fontSize: 14,
-    color: '#000000',
-    marginBottom: 4,
+    fontSize: fs(14),
+    color: Colors.textPrimary,
+    marginBottom: vs(4),
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: s(4),
   },
   ratingText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#6C6C70',
+    fontSize: fs(14),
+    color: Colors.textSecondary,
   },
   divider: {
     height: 1,
-    backgroundColor: '#EBEBEB',
-    marginBottom: 18,
+    backgroundColor: Colors.borderLight,
+    marginBottom: vs(18),
   },
   title: {
     fontFamily: 'Inter-Bold',
-    fontSize: 24,
-    color: '#000000',
+    fontSize: fs(24),
+    color: Colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: vs(8),
     letterSpacing: 0.048,
   },
   subtitle: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#6C6C70',
+    fontSize: fs(14),
+    color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 18,
-    paddingHorizontal: 20,
+    marginBottom: vs(18),
+    paddingHorizontal: s(20),
   },
   starsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 22,
+    marginBottom: vs(22),
   },
   starButton: {
-    paddingHorizontal: 2,
+    paddingHorizontal: s(2),
   },
   feedbackLabel: {
     fontFamily: 'Inter-Bold',
-    fontSize: 12,
-    color: '#000000',
+    fontSize: fs(12),
+    color: Colors.textPrimary,
     letterSpacing: 0.024,
-    marginBottom: 8,
+    marginBottom: vs(8),
   },
   feedbackBox: {
     borderWidth: 1,
-    borderColor: '#F0EFF2',
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 18,
+    borderColor: Colors.border,
+    borderRadius: s(6),
+    backgroundColor: Colors.white,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(10),
+    marginBottom: vs(18),
   },
-  // Grows with the text (min ~3 lines) up to a cap, then scrolls — the sheet
-  // itself doesn't scroll, so we bound the growth to keep Submit reachable.
   feedbackInput: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#000000',
+    fontSize: fs(14),
+    color: Colors.textPrimary,
     padding: 0,
-    minHeight: 56,
-    maxHeight: 120,
+    minHeight: vs(56),
+    maxHeight: vs(120),
     textAlignVertical: 'top',
   },
   submitButton: {
-    height: 52,
-    backgroundColor: '#0097B3',
-    borderRadius: 6,
+    height: vs(52),
+    backgroundColor: Colors.primary,
+    borderRadius: s(6),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: vs(8),
   },
   submitText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 17,
-    color: '#FFFFFF',
+    fontSize: fs(17),
+    color: Colors.white,
     letterSpacing: 0.5,
   },
 });

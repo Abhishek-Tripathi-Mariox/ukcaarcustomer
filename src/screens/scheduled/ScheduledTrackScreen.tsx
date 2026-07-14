@@ -16,7 +16,8 @@ import MapView, {
 } from 'react-native-maps';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { CabIcon } from '@/components/icons/HomeIcons';
 import {
   joinRouteRoom,
@@ -190,13 +191,13 @@ export const ScheduledTrackScreen: React.FC<ScheduledTrackScreenProps> = ({
         </View>
       )}
 
-      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + vs(14) }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={s(24)} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Track Vehicle</Text>
         <View style={styles.backBtn} />
@@ -208,7 +209,7 @@ export const ScheduledTrackScreen: React.FC<ScheduledTrackScreenProps> = ({
             style={[
               styles.statusDot,
               {
-                backgroundColor: driverPos ? '#00C896' : '#9CA3AF',
+                backgroundColor: driverPos ? Colors.success : Colors.textMuted,
               },
             ]}
           />
@@ -232,7 +233,7 @@ export const ScheduledTrackScreen: React.FC<ScheduledTrackScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB' },
+  container: { flex: 1, backgroundColor: Colors.backgroundCard },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {
@@ -240,89 +241,85 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#0097B3',
-    paddingBottom: 16,
-    paddingHorizontal: 12,
+    backgroundColor: Colors.primary,
+    paddingBottom: vs(16),
+    paddingHorizontal: s(12),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   backBtn: {
-    width: 40,
-    height: 40,
+    width: s(32),
+    height: s(32),
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    lineHeight: 28,
-    color: '#FFFFFF',
+    fontSize: fs(18),
+    lineHeight: fs(28),
+    color: Colors.white,
   },
 
   stopPin: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
+    width: s(12),
+    height: s(12),
+    borderRadius: s(6),
+    backgroundColor: Colors.white,
     borderWidth: 2,
     borderColor: Colors.primary,
   },
   stopPinFirst: {
     backgroundColor: Colors.primary,
-    borderColor: '#FFFFFF',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    borderColor: Colors.white,
+    width: s(16),
+    height: s(16),
+    borderRadius: s(8),
   },
   stopPinLast: {
-    backgroundColor: '#EF4444',
-    borderColor: '#FFFFFF',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    backgroundColor: Colors.error,
+    borderColor: Colors.white,
+    width: s(16),
+    height: s(16),
+    borderRadius: s(8),
   },
 
   statusCard: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    left: s(16),
+    right: s(16),
+    backgroundColor: Colors.white,
+    borderRadius: s(14),
+    paddingVertical: vs(14),
+    paddingHorizontal: s(16),
+    ...Shadow.md,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: s(8),
   },
   statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: s(10),
+    height: s(10),
+    borderRadius: s(5),
   },
   statusText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 15,
-    color: '#101828',
+    fontSize: fs(15),
+    color: Colors.textPrimary,
   },
   statusSub: {
     fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: '#6A7282',
-    marginTop: 4,
-    marginLeft: 18,
+    fontSize: fs(12),
+    color: Colors.textSecondary,
+    marginTop: vs(4),
+    marginLeft: s(18),
   },
   routeName: {
     fontFamily: 'Inter-Medium',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.primary,
-    marginTop: 8,
+    marginTop: vs(8),
   },
 });

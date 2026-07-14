@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Shadow } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
 import { routeService, type RouteVehicle } from '@/services/routeService';
 
@@ -195,8 +196,8 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.routeBanner}>
-            <Text style={styles.routeBannerTitle}>{scheduledRoute.name}</Text>
-            <Text style={styles.routeBannerSub}>
+            <Text style={styles.routeBannerTitle} numberOfLines={2}>{scheduledRoute.name}</Text>
+            <Text style={styles.routeBannerSub} numberOfLines={2}>
               {boarding.name} → {dropping.name}
             </Text>
           </View>
@@ -266,90 +267,90 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.white, flex: 1, textAlign: 'center' },
-  content: { padding: 16, paddingBottom: 120 },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.white, flex: 1, textAlign: 'center' },
+  content: { padding: s(16), paddingBottom: vs(120) },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: s(24) },
 
   routeBanner: {
     backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
+    borderRadius: s(12),
+    padding: s(14),
+    marginBottom: vs(16),
     borderWidth: 1,
     borderColor: Colors.borderLight,
   },
-  routeBannerTitle: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.textPrimary },
-  routeBannerSub: { fontFamily: 'Inter-Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  routeBannerTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.textPrimary },
+  routeBannerSub: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: Colors.textSecondary, marginTop: vs(2), flexShrink: 1 },
 
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.white,
-    borderRadius: 12,
+    borderRadius: s(12),
     borderWidth: 1,
     borderColor: Colors.borderLight,
-    padding: 14,
-    marginBottom: 18,
+    padding: s(14),
+    marginBottom: vs(18),
   },
-  stepperLabel: { fontFamily: 'Inter-SemiBold', fontSize: 15, color: Colors.textPrimary },
-  stepperHint: { fontFamily: 'Inter-Regular', fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  stepperLabel: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.textPrimary },
+  stepperHint: { fontFamily: 'Inter-Regular', fontSize: fs(11), color: Colors.textMuted, marginTop: vs(2) },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: s(14) },
   stepBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: s(36),
+    height: s(36),
+    borderRadius: s(10),
     borderWidth: 1.5,
     borderColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepBtnDisabled: { borderColor: '#E0E0E0' },
-  stepValue: { fontFamily: 'Inter-SemiBold', fontSize: 18, color: Colors.textPrimary, minWidth: 22, textAlign: 'center' },
+  stepBtnDisabled: { borderColor: Colors.borderLight },
+  stepValue: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.textPrimary, minWidth: s(22), textAlign: 'center' },
 
-  sectionTitle: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.textPrimary, marginBottom: 12 },
+  sectionTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.textPrimary, marginBottom: vs(12) },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: s(12),
     backgroundColor: Colors.white,
-    borderRadius: 14,
+    borderRadius: s(14),
     borderWidth: 1.5,
     borderColor: Colors.borderLight,
-    padding: 14,
-    marginBottom: 12,
+    padding: s(14),
+    marginBottom: vs(12),
     ...Shadow.sm,
   },
-  cardActive: { borderColor: Colors.primary, backgroundColor: 'rgba(0, 151, 179, 0.05)' },
-  cardDisabled: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB', shadowOpacity: 0, elevation: 0 },
+  cardActive: { borderColor: Colors.primary, backgroundColor: alpha(Colors.primary, 0.05) },
+  cardDisabled: { backgroundColor: Colors.backgroundDisabled, borderColor: Colors.borderLight, shadowOpacity: 0, elevation: 0 },
   cardIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 151, 179, 0.10)',
+    width: s(46),
+    height: s(46),
+    borderRadius: s(12),
+    backgroundColor: alpha(Colors.primary, 0.10),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  vehicleName: { fontFamily: 'Inter-SemiBold', fontSize: 15, color: Colors.textPrimary },
-  driverName: { fontFamily: 'Inter-Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
-  metaText: { fontFamily: 'Inter-Medium', fontSize: 12, color: Colors.textSecondary },
-  metaDot: { color: Colors.textMuted, marginHorizontal: 2 },
+  vehicleName: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.textPrimary },
+  driverName: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: Colors.textSecondary, marginTop: vs(2) },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: s(4), marginTop: vs(6) },
+  metaText: { fontFamily: 'Inter-Medium', fontSize: fs(12), color: Colors.textSecondary },
+  metaDot: { color: Colors.textMuted, marginHorizontal: s(2) },
   okText: { color: Colors.primary },
-  warnText: { color: '#E08600' },
-  fullText: { color: '#D11A2A' },
-  tooFewNote: { fontFamily: 'Inter-Regular', fontSize: 11, color: '#E08600', marginTop: 4 },
-  mutedText: { color: '#9CA3AF' },
+  warnText: { color: Colors.warning },
+  fullText: { color: Colors.error },
+  tooFewNote: { fontFamily: 'Inter-Regular', fontSize: fs(11), color: Colors.warning, marginTop: vs(4) },
+  mutedText: { color: Colors.textMuted },
 
   radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
     borderWidth: 1.5,
     borderColor: Colors.border,
     alignItems: 'center',
@@ -359,11 +360,11 @@ const styles = StyleSheet.create({
 
   helperText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.textMuted,
     textAlign: 'center',
-    marginTop: 16,
-    paddingHorizontal: 12,
+    marginTop: vs(16),
+    paddingHorizontal: s(12),
   },
 
   footer: {
@@ -371,18 +372,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: s(16),
+    paddingTop: vs(12),
     backgroundColor: Colors.backgroundCard,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
   cta: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(8),
+    height: vs(56),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.white },
+  ctaText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.white },
 });

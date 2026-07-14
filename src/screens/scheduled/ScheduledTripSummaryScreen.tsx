@@ -11,7 +11,8 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { SafeQR } from '@/components/SafeQR';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Shadow } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { useAppSelector } from '@/store/hooks';
 import { rideService, Ride } from '@/services/rideService';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
@@ -213,10 +214,10 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
 
       <View style={styles.header}>
         <TouchableOpacity onPress={handleGoHome} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.white} />
+          <Ionicons name="chevron-back" size={s(24)} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Summary</Text>
-        <View style={{ width: 32 }} />
+        <View style={{ width: s(32) }} />
       </View>
 
       {loading ? (
@@ -433,41 +434,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(18),
     color: Colors.white,
     flex: 1,
     textAlign: 'center',
   },
 
-  content: { padding: 16, paddingBottom: 120 },
+  content: { padding: s(16), paddingBottom: vs(120) },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   heading: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 20,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(20),
     color: Colors.textPrimary,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: vs(6),
   },
   subheading: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(14),
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 22,
+    marginTop: vs(4),
+    marginBottom: vs(22),
   },
 
   ticket: {
     backgroundColor: Colors.white,
-    borderRadius: 18,
-    padding: 22,
+    borderRadius: s(18),
+    padding: s(22),
     borderWidth: 1,
     borderColor: Colors.borderLight,
     ...Shadow.sm,
@@ -476,149 +477,149 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(0,151,179,0.1)',
+    gap: s(6),
+    paddingHorizontal: s(10),
+    paddingVertical: vs(6),
+    backgroundColor: alpha(Colors.primary, 0.1),
     borderRadius: 999,
   },
   statusPillText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(12),
     color: Colors.primary,
   },
   routeName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 22,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(22),
     color: Colors.textPrimary,
-    marginTop: 12,
+    marginTop: vs(12),
   },
 
   divider: {
     height: 1,
     backgroundColor: Colors.borderLight,
-    marginVertical: 14,
+    marginVertical: vs(14),
   },
 
   row: { flexDirection: 'row', alignItems: 'flex-start' },
-  rowBody: { marginLeft: 8, flex: 1 },
-  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textMuted },
+  rowBody: { marginLeft: s(8), flex: 1 },
+  rowLabel: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: Colors.textMuted },
   rowValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(15),
     color: Colors.textPrimary,
-    marginTop: 2,
+    marginTop: vs(2),
   },
   routeLine: {
     width: 1.5,
-    height: 14,
+    height: vs(14),
     backgroundColor: Colors.border,
-    marginLeft: 8,
-    marginVertical: 4,
+    marginLeft: s(8),
+    marginVertical: vs(4),
   },
 
   // Passengers
   paxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: vs(12),
   },
   paxSeatBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,151,179,0.1)',
+    width: s(34),
+    height: s(34),
+    borderRadius: s(8),
+    backgroundColor: alpha(Colors.primary, 0.1),
     alignItems: 'center',
     justifyContent: 'center',
   },
   paxSeatText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(13),
     color: Colors.primary,
   },
-  paxBody: { marginLeft: 12, flex: 1 },
+  paxBody: { marginLeft: s(12), flex: 1 },
   paxName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(15),
     color: Colors.textPrimary,
   },
   paxContact: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
     color: Colors.textMuted,
     marginTop: 1,
   },
 
   // QR
-  qrSection: { alignItems: 'center', marginTop: 4 },
+  qrSection: { alignItems: 'center', marginTop: vs(4) },
   qrCard: {
-    padding: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    padding: s(12),
+    backgroundColor: Colors.white,
+    borderRadius: s(12),
     borderWidth: 1,
     borderColor: Colors.borderLight,
   },
   qrRef: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(14),
     letterSpacing: 1,
     color: Colors.textPrimary,
-    marginTop: 12,
+    marginTop: vs(12),
   },
   qrHint: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
     color: Colors.textMuted,
-    marginTop: 2,
+    marginTop: vs(2),
   },
 
   fareRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: vs(8),
   },
-  fareLabel: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary },
-  fareValue: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: Colors.textPrimary },
+  fareLabel: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: Colors.textSecondary },
+  fareValue: { fontFamily: 'Inter-SemiBold', fontSize: fs(13), color: Colors.textPrimary },
 
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  totalLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.textPrimary },
-  totalValue: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textPrimary },
+  totalLabel: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.textPrimary },
+  totalValue: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.textPrimary },
 
   tearRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 14,
-    marginHorizontal: -22,
-    paddingHorizontal: 8,
+    marginTop: vs(14),
+    marginHorizontal: -s(22),
+    paddingHorizontal: s(8),
   },
   tearDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.background,
-    marginBottom: -5,
+    width: s(10),
+    height: s(10),
+    borderRadius: s(5),
+    backgroundColor: Colors.backgroundCard,
+    marginBottom: -s(5),
   },
 
   tipBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: 'rgba(0,151,179,0.06)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginTop: 18,
+    gap: s(8),
+    backgroundColor: alpha(Colors.primary, 0.06),
+    borderRadius: s(12),
+    paddingVertical: vs(12),
+    paddingHorizontal: s(14),
+    marginTop: vs(18),
   },
   tipText: {
     flex: 1,
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    lineHeight: 18,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    lineHeight: fs(18),
     color: Colors.textSecondary,
   },
 
@@ -627,51 +628,45 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 16,
+    padding: s(16),
     backgroundColor: Colors.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    ...Shadow.top,
   },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: s(8),
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(8),
+    height: vs(56),
   },
   ctaText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
-    lineHeight: 24,
-    letterSpacing: -0.3,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
     color: Colors.white,
   },
 
   returnLegBlock: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: vs(12),
+    paddingTop: vs(12),
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
   returnLegHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: s(6),
+    marginBottom: vs(4),
   },
   returnLegTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(14),
     color: Colors.primary,
   },
   returnLegTime: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(18),
     color: Colors.textPrimary,
   },
 });

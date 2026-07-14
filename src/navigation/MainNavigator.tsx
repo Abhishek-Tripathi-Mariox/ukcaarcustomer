@@ -24,6 +24,7 @@ import {
   ToggleSwitch,
 } from '@/components/icons/ProfileIcons';
 import { SecuredShieldIcon } from '@/components/icons/PaymentOptionIcons';
+import { HomeGlyphIcon } from '@/components/icons/TabBarIcons';
 
 import { HomeScreen } from '@/screens/home';
 import {
@@ -122,7 +123,7 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   return (
     <View style={profileStyles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       {/* Teal header */}
       <View style={[profileStyles.header, { paddingTop: insets.top + 14 }]}>
         <TouchableOpacity
@@ -465,6 +466,9 @@ const profileStyles = StyleSheet.create({
 const Tab = createBottomTabNavigator();
 
 const TabNavigator: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 10);
+
   return (
     <Tab.Navigator
       initialRouteName="Home"
@@ -477,30 +481,54 @@ const TabNavigator: React.FC = () => {
           backgroundColor: Colors.backgroundCard,
           borderTopWidth: 1,
           borderTopColor: Colors.divider,
-          height: 65,
-          paddingBottom: 10,
+          height: 58 + bottomPad,
+          paddingBottom: bottomPad,
           paddingTop: 6,
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.tabInactive,
-        tabBarLabelStyle: {
-          fontFamily: 'Inter-Medium',
-          fontSize: 11,
-        },
+        // Figma footer (20087213.svg): the active tab's LABEL is dark bold,
+        // not tinted teal like the icon — so we render the label ourselves
+        // instead of letting it inherit tabBarActiveTintColor.
+        tabBarLabel: ({ focused }) => (
+          <Text
+            style={{
+              // No Inter font is bundled, so drive weight via fontWeight (real
+              // bold) rather than a fontFamily that would fall back to regular.
+              fontWeight: focused ? '700' : '500',
+              fontSize: 11,
+              color: focused ? Colors.textPrimary : Colors.tabInactive,
+            }}
+          >
+            {route.name}
+          </Text>
+        ),
         tabBarIcon: ({ focused, color }) => {
-          let iconName: any;
           switch (route.name) {
             case 'Activity':
-              iconName = focused ? 'document-text' : 'document-text-outline';
-              break;
+              // Note/document glyph (rounded card with content lines) per Figma
+              return (
+                <Ionicons
+                  name={focused ? 'document-text' : 'document-text-outline'}
+                  size={23}
+                  color={color}
+                />
+              );
             case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
+              // Custom filled-teal rounded house with a base notch.
+              return <HomeGlyphIcon size={24} color={color} focused={focused} />;
             case 'Account':
-              iconName = focused ? 'person' : 'person-outline';
-              break;
+              // Person-in-a-circle glyph per Figma (not the bare person).
+              return (
+                <Ionicons
+                  name={focused ? 'person-circle' : 'person-circle-outline'}
+                  size={25}
+                  color={color}
+                />
+              );
+            default:
+              return null;
           }
-          return <Ionicons name={iconName} size={22} color={color} />;
         },
       })}
     >

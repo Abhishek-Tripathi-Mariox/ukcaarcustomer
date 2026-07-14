@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius } from '@/theme';
@@ -210,53 +211,53 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
+    paddingHorizontal: s(Spacing.base), paddingVertical: vs(Spacing.md),
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  list: { paddingBottom: Spacing['3xl'] },
+  backBtn: { width: s(36), height: s(36), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-Bold', fontSize: fs(20), color: '#1E293B' },
+  list: { paddingBottom: vs(Spacing['3xl']) },
 
   // Unread bar
   unreadBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.xl, paddingVertical: 10,
+    paddingHorizontal: s(Spacing.xl), paddingVertical: vs(10),
     backgroundColor: '#F8F9FA', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
   },
-  unreadText: { fontSize: 14, fontWeight: '600', color: '#7D8A95' },
-  markAllText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
+  unreadText: { fontFamily: 'Inter-SemiBold', fontSize: fs(14), color: '#7D8A95' },
+  markAllText: { fontFamily: 'Inter-SemiBold', fontSize: fs(14), color: Colors.primary },
 
   // Notification row
   notifRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md,
-    paddingHorizontal: Spacing.xl, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'flex-start', gap: s(Spacing.md),
+    paddingHorizontal: s(Spacing.xl), paddingVertical: vs(16),
     borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
   notifUnread: { backgroundColor: 'rgba(0,151,179,0.04)' },
   notifIcon: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center', marginTop: 2,
+    width: s(44), height: s(44), borderRadius: s(22),
+    alignItems: 'center', justifyContent: 'center', marginTop: vs(2),
   },
   notifContent: { flex: 1 },
   notifHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: vs(4),
   },
-  notifTitle: { fontSize: 15, fontWeight: '500', color: Colors.black, flex: 1, marginRight: 8 },
-  notifTitleUnread: { fontWeight: '700' },
-  notifTime: { fontSize: 12, color: '#B0B0B0' },
-  notifBody: { fontSize: 14, color: '#7D8A95', lineHeight: 20 },
+  notifTitle: { fontFamily: 'Inter-Medium', fontSize: fs(15), color: Colors.black, flex: 1, marginRight: s(8) },
+  notifTitleUnread: { fontFamily: 'Inter-Bold' },
+  notifTime: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: '#B0B0B0' },
+  notifBody: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#7D8A95', lineHeight: fs(20) },
   unreadDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: Colors.primary, marginTop: 6,
+    width: s(8), height: s(8), borderRadius: s(4),
+    backgroundColor: Colors.primary, marginTop: vs(6),
   },
 
   // Empty
-  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: Spacing.xl },
+  empty: { alignItems: 'center', paddingTop: vs(80), paddingHorizontal: s(Spacing.xl) },
   emptyIconWrap: {
-    width: 80, height: 80, borderRadius: 40,
+    width: s(80), height: s(80), borderRadius: s(40),
     backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: vs(Spacing.lg),
   },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: '#7D8A95', marginBottom: 8 },
-  emptyDesc: { fontSize: 14, color: '#B0B0B0', textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: '#7D8A95', marginBottom: vs(8) },
+  emptyDesc: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#B0B0B0', textAlign: 'center', lineHeight: fs(20) },
 });

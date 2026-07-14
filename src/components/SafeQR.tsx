@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { Colors } from '@/theme';
+import { fs, s } from '@/theme/responsive';
 
 interface Props {
   value: string;
@@ -24,7 +26,7 @@ export class SafeQR extends React.Component<Props, { failed: boolean }> {
   }
 
   render() {
-    const size = this.props.size ?? 150;
+    const size = this.props.size ?? s(150);
     if (this.state.failed || !this.props.value) {
       return (
         <View style={[styles.fallback, { width: size, height: size }]}>
@@ -36,8 +38,8 @@ export class SafeQR extends React.Component<Props, { failed: boolean }> {
       <QRCode
         value={this.props.value}
         size={size}
-        backgroundColor="#FFFFFF"
-        color="#1E293B"
+        backgroundColor={Colors.white}
+        color={Colors.textPrimary}
       />
     );
   }
@@ -47,8 +49,12 @@ const styles = StyleSheet.create({
   fallback: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: s(8),
   },
-  fallbackText: { fontSize: 12, color: '#64748B' },
+  fallbackText: { 
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12), 
+    color: Colors.textSecondary,
+  },
 });

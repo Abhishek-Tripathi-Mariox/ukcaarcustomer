@@ -11,16 +11,17 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Shadow } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
 import { routeService, type RouteVehicle } from '@/services/routeService';
 import { BusSeatIcon, DriverHeadIcon } from '@/components/icons/SeatIcons';
 
 // Figma node 70:8730 — selected seats use a rose-red border / icon.
 // Available are teal, booked are neutral grey with 20% opacity tile.
-const COLOR_AVAILABLE = '#0097B3';
-const COLOR_SELECTED = '#CA3156';
-const COLOR_BOOKED = '#101010';
+const COLOR_AVAILABLE = Colors.primary;
+const COLOR_SELECTED = Colors.error;
+const COLOR_BOOKED = Colors.textPrimary;
 
 interface Stop { id: string; name: string; time: string }
 
@@ -315,150 +316,128 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.white },
-  headerSub: { fontFamily: 'Poppins-Light', fontSize: 10, color: Colors.white, marginTop: 2 },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.white },
+  headerSub: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: Colors.white, marginTop: vs(2) },
 
-  content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40, alignItems: 'center' },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  content: { paddingHorizontal: s(24), paddingTop: vs(24), paddingBottom: vs(40), alignItems: 'center' },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: s(24) },
   errorText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: fs(20),
   },
   retryBtn: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
+    marginTop: vs(16),
+    paddingHorizontal: s(24),
+    paddingVertical: vs(10),
+    borderRadius: s(8),
     backgroundColor: Colors.primary,
   },
-  retryText: { fontFamily: 'Inter-SemiBold', fontSize: 14, color: Colors.white },
-  // Driver tile — Figma node 70:8858. 67×67 white square with teal
-  // border + 20px radius. Driver bust icon sits inside, label below.
+  retryText: { fontFamily: 'Inter-SemiBold', fontSize: fs(14), color: Colors.white },
+
   driverTile: {
-    width: 67,
-    height: 67,
-    borderRadius: 20,
+    width: s(67),
+    height: s(67),
+    borderRadius: s(20),
     borderWidth: 1,
     borderColor: Colors.primary,
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: vs(6),
   },
   driverLabel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#101010',
-    marginBottom: 24,
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14),
+    color: Colors.textPrimary,
+    marginBottom: vs(24),
   },
 
-  // 4 columns of 74×74 tiles with 17px gap = 74·4 + 17·3 = 347 ≈ Figma's
-  // 4×91-stride from x=30 to x=303 (74 + 17 col-gap).
-  grid: { gap: 16, alignItems: 'center' },
-  row: { flexDirection: 'row', gap: 17 },
+  grid: { gap: s(16), alignItems: 'center' },
+  row: { flexDirection: 'row', gap: s(17) },
 
-  // Seat tile — Figma node 70:8705. White square with colored 1px
-  // border, 22px radius, vertically stacks icon over number with 9px gap.
   seatTile: {
-    width: 74,
-    height: 74,
-    borderRadius: 22,
+    width: s(74),
+    height: s(74),
+    borderRadius: s(22),
     borderWidth: 1,
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    gap: 4,
+    paddingVertical: vs(10),
+    gap: s(4),
   },
-  // Booked tiles fade out the whole tile (border + icon + number) at
-  // 20% opacity to match the Figma washed-out treatment.
   seatTileBooked: { opacity: 0.2 },
   seatNum: {
     fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    lineHeight: 18,
+    fontSize: fs(16),
+    lineHeight: fs(18),
   },
 
-  // Legend — three equal-width cells, small seat icon + 12px caption.
-  // Matches Figma node 70:8655 layout.
   legend: {
     flexDirection: 'row',
     alignSelf: 'stretch',
-    marginTop: 28,
-    gap: 23,
+    marginTop: vs(28),
+    gap: s(23),
   },
   legendItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: s(8),
   },
   legendText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    color: 'rgba(0,0,0,0.54)',
+    fontSize: fs(12),
+    color: Colors.textSecondary,
   },
 
-  // Footer — white card with top-only shadow, total on the left and
-  // the big teal CTA below. Mirrors Figma node 70:8897 / 70:8645.
   footer: {
     backgroundColor: Colors.white,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    padding: s(16),
+    ...Shadow.top,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 4,
+    marginBottom: vs(12),
+    paddingHorizontal: s(4),
   },
   totalLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: '#000000',
-    opacity: 0.8,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
   },
-  // Sub-line under "Total Amount" — "<n> seats × ₹X" so the rider sees
-  // exactly how the total was derived from the admin-set seat price.
   totalBreakdown: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#000000',
-    opacity: 0.5,
-    marginTop: 2,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textSecondary,
+    marginTop: vs(2),
   },
   totalValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 24,
-    color: '#000000',
-    opacity: 0.8,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(24),
+    color: Colors.textPrimary,
   },
   cta: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(8),
+    height: vs(56),
     alignItems: 'center',
     justifyContent: 'center',
   },
   ctaDisabled: { opacity: 0.5 },
   ctaText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
-    lineHeight: 24,
-    letterSpacing: -0.3,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
     color: Colors.white,
   },
 });

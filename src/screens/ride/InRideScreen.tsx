@@ -18,6 +18,7 @@ import MapView, {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { useAppSelector } from '@/store/hooks';
 import { rideService } from '@/services/rideService';
 import { geoService, GeoDirections } from '@/services/geoService';
@@ -152,6 +153,49 @@ export const InRideScreen: React.FC<InRideScreenProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRide?.status, currentRide?._id]);
+
+  // REST fallback poll. The driver's "End trip" / "Cash collected" flips the
+  // ride to payment_pending/completed on the server, but the `ride:status`
+  // socket push only reaches us when our socket sits on the same backend
+  // instance that handled it. In a split/multi-instance deployment it never
+  // arrives — which is the "driver marked cash collected but nothing updates
+  // on the rider side" bug. Polling the shared ride state guarantees we still
+  // move to the receipt once the DB reflects the terminal status.
+  const navigatedRef = useRef(false);
+  useEffect(() => {
+    if (!rideId) return;
+    let cancelled = false;
+    const poll = async () => {
+      if (navigatedRef.current) return;
+      try {
+        const ride: any = await rideService.getRide(rideId);
+        if (cancelled || navigatedRef.current || !ride) return;
+        if (ride.status === 'payment_pending' || ride.status === 'completed') {
+          navigatedRef.current = true;
+          navigation.replace('RideComplete', {
+            rideId,
+            pickup,
+            dropoff,
+            rideType,
+            fare,
+            distance,
+            duration,
+            driver,
+          });
+        } else if (ride.status === 'cancelled') {
+          navigatedRef.current = true;
+          navigation.replace('CancelRide', { rideId });
+        }
+      } catch {
+        /* transient network error — the next tick retries */
+      }
+    };
+    const id = setInterval(poll, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [rideId, navigation, pickup, dropoff, rideType, fare, distance, duration, driver]);
 
   // Compute the trip polyline (driver → dropoff). Refetch only when the
   // driver moves > ~150 m so we don't hammer the directions proxy.
@@ -352,21 +396,21 @@ const styles = StyleSheet.create({
   /* Info card */
   infoCard: {
     position: 'absolute',
-    left: 15,
-    minWidth: 174,
+    left: s(15),
+    minWidth: s(174),
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: s(8),
     backgroundColor: '#FEFEFE',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minHeight: 43,
-    shadowColor: '#000',
+    borderTopLeftRadius: s(12),
+    borderTopRightRadius: s(12),
+    borderBottomRightRadius: s(12),
+    paddingHorizontal: s(14),
+    paddingVertical: vs(10),
+    minHeight: vs(43),
+    shadowColor: Colors.black,
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
@@ -374,22 +418,22 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 15,
+    fontSize: fs(15),
     color: '#545365',
-    maxWidth: 220,
+    maxWidth: s(220),
   },
   etaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: s(12),
     backgroundColor: '#FEFEFE',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    marginTop: 1,
+    borderBottomLeftRadius: s(12),
+    borderBottomRightRadius: s(12),
+    paddingHorizontal: s(14),
+    paddingVertical: vs(6),
+    marginTop: vs(1),
     alignSelf: 'flex-start',
-    shadowColor: '#000',
+    shadowColor: Colors.black,
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
@@ -397,51 +441,51 @@ const styles = StyleSheet.create({
   },
   etaLabel: {
     fontFamily: 'Inter-Regular',
-    fontSize: 15,
+    fontSize: fs(15),
     color: '#545365',
   },
   etaPill: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    borderRadius: s(10),
+    paddingHorizontal: s(12),
+    paddingVertical: vs(5),
   },
   etaPillText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
+    fontSize: fs(14),
     color: '#FEFEFE',
   },
 
   statusBanner: {
     position: 'absolute',
-    right: 15,
+    right: s(15),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: s(6),
     backgroundColor: '#FFE974',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
+    paddingHorizontal: s(12),
+    paddingVertical: vs(6),
+    borderRadius: s(999),
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: Colors.black,
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
   },
   statusBannerText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#333',
   },
 
   dropMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: s(28),
+    height: s(28),
+    borderRadius: s(14),
     backgroundColor: '#3B5BDB',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.black,
     shadowOpacity: 0.18,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
@@ -454,15 +498,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 19,
+    paddingHorizontal: s(19),
   },
   sosButton: {
-    backgroundColor: '#EB001B',
-    borderRadius: 20,
-    height: 64,
+    backgroundColor: Colors.error,
+    borderRadius: s(20),
+    height: vs(64),
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.black,
     shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -470,7 +514,7 @@ const styles = StyleSheet.create({
   },
   sosText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
+    fontSize: fs(18),
     color: Colors.white,
   },
 });

@@ -23,7 +23,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/theme';
 import { Avatar } from '@/components/common';
 import { useAppSelector } from '@/store/hooks';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '@/store';
+import { setCurrentRide } from '@/store/slices/rideSlice';
 import { geoService, GeoDirections } from '@/services/geoService';
+import { fs, s, vs } from '@/theme/responsive';
 import { rideService } from '@/services/rideService';
 import { CabIcon } from '@/components/icons/HomeIcons';
 import {
@@ -216,6 +220,32 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  // REST fallback poll. Status transitions while the rider waits here
+  // (driver_arriving → driver_arrived → in_progress, or a cancel) come over
+  // the `ride:status` socket, which only reaches us when our socket sits on
+  // the same backend instance that handled the update. In a split /
+  // multi-instance deployment those pushes silently never arrive and the
+  // screen freezes on "driver assigned". Polling the shared ride state keeps
+  // `currentRide` fresh so the status-transition effect above still fires.
+  const dispatch = useDispatch<AppDispatch>();
+  useEffect(() => {
+    if (!rideId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const fresh: any = await rideService.getRide(rideId);
+        if (!cancelled && fresh) dispatch(setCurrentRide(fresh));
+      } catch {
+        /* transient network error — the next tick retries */
+      }
+    };
+    const id = setInterval(tick, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [rideId, dispatch]);
   const pickupCoord: LatLng | null = useMemo(() => {
     if (pickupLoc) return { lat: pickupLoc.lat, lng: pickupLoc.lng };
     if (currentRide?.pickup) return { lat: currentRide.pickup.lat, lng: currentRide.pickup.lng };
@@ -610,7 +640,7 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.white,
   },
   mapArea: {
     height: '45%',
@@ -620,9 +650,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pickupMarker: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
     backgroundColor: Colors.white,
     borderWidth: 3,
     borderColor: Colors.primary,
@@ -630,15 +660,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pickupMarkerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: s(8),
+    height: s(8),
+    borderRadius: s(4),
     backgroundColor: Colors.primary,
   },
   dropMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: s(28),
+    height: s(28),
+    borderRadius: s(14),
     backgroundColor: '#3B5BDB',
     alignItems: 'center',
     justifyContent: 'center',
@@ -652,33 +682,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: s(16),
   },
   otpBadge: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: Colors.white,
+    borderRadius: s(8),
+    paddingHorizontal: s(12),
+    paddingVertical: vs(8),
     borderWidth: 1.5,
     borderColor: '#EDAE10',
   },
   otpText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
+    fontSize: fs(14),
     color: '#333333',
   },
   cancelBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 4,
+    backgroundColor: Colors.white,
+    borderRadius: s(8),
+    paddingHorizontal: s(12),
+    paddingVertical: vs(8),
+    gap: s(4),
   },
   cancelText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
+    fontSize: fs(14),
     color: '#FF3D57',
   },
   etaBanner: {
@@ -686,132 +716,132 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFE066',
-    paddingVertical: 12,
-    gap: 6,
+    paddingVertical: vs(12),
+    gap: s(6),
   },
   etaText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: '#333333',
   },
   bottomSection: {
     flex: 1,
   },
   bottomContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: s(20),
+    paddingTop: vs(16),
+    paddingBottom: vs(24),
   },
   driverCard: {
     backgroundColor: Colors.primary,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: s(16),
+    padding: s(16),
+    marginBottom: vs(16),
   },
   toPayRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: vs(12),
   },
   toPayLabel: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: 'rgba(255,255,255,0.8)',
   },
   toPayAmount: {
     fontFamily: 'Inter-Bold',
-    fontSize: 28,
-    color: '#FFFFFF',
+    fontSize: fs(28),
+    color: Colors.white,
   },
   vehicleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: s(12),
+    padding: s(12),
   },
   vehicleInfo: {
     flex: 1,
   },
   vehicleName: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: 'rgba(255,255,255,0.8)',
   },
   vehiclePlate: {
     fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    color: '#FFFFFF',
-    marginTop: 2,
+    fontSize: fs(18),
+    color: Colors.white,
+    marginTop: vs(2),
   },
   vehicleEmoji: {
-    fontSize: 40,
+    fontSize: fs(40),
   },
   driverRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+    gap: s(12),
+    marginBottom: vs(16),
   },
   driverInfo: {
     flex: 1,
   },
   driverName: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: Colors.textPrimary,
   },
   driverMeta: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: '#7D8A95',
-    marginTop: 2,
+    marginTop: vs(2),
   },
   driverAvatarImg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: s(48),
+    height: s(48),
+    borderRadius: s(24),
     backgroundColor: '#E0E0E0',
   },
   driverPhone: {
     fontFamily: 'Inter-Regular',
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#9AA3AC',
-    marginTop: 2,
+    marginTop: vs(2),
   },
   dashedDivider: {
     height: 1,
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderStyle: 'dashed',
-    marginBottom: 16,
+    marginBottom: vs(16),
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
-    marginBottom: 20,
+    gap: s(16),
+    marginBottom: vs(20),
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    gap: 6,
+    backgroundColor: Colors.white,
+    borderRadius: s(25),
+    paddingHorizontal: s(20),
+    paddingVertical: vs(10),
+    gap: s(6),
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   actionLabel: {
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textPrimary,
   },
   footerText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.primary,
     textAlign: 'center',
   },

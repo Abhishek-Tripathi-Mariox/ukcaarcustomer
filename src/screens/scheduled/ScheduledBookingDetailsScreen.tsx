@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Shadow } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { routeService } from '@/services/routeService';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
 import type { Passenger } from './ScheduledPassengerDetailsScreen';
@@ -154,18 +155,15 @@ export const ScheduledBookingDetailsScreen: React.FC<Props> = ({ navigation, rou
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <View style={styles.header}>
         <TouchableOpacity
-          // The booking persists on the backend — leaving the screen
-          // shouldn't pop the booking-flow stack (which would dump the
-          // rider back on the seat/pickers). Drop straight to Home.
           onPress={handleGoHome}
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+          <Ionicons name="chevron-back" size={s(24)} color={Colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -275,166 +273,168 @@ export const ScheduledBookingDetailsScreen: React.FC<Props> = ({ navigation, rou
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: Colors.backgroundCard },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: s(8),
+    paddingVertical: vs(8),
+    backgroundColor: Colors.primary,
   },
   backBtn: {
-    width: 40,
-    height: 40,
+    width: s(40),
+    height: s(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  content: { paddingHorizontal: 16, paddingBottom: 40 },
+  content: { paddingHorizontal: s(16), paddingBottom: vs(40) },
 
-  hero: { alignItems: 'center', marginTop: 8, marginBottom: 24 },
+  hero: { alignItems: 'center', marginTop: vs(8), marginBottom: vs(24) },
   checkCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: s(80),
+    height: s(80),
+    borderRadius: s(40),
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 30,
-    lineHeight: 40,
-    color: '#1E293B',
+    fontSize: fs(30),
+    lineHeight: fs(40),
+    color: Colors.textPrimary,
     textAlign: 'center',
-    marginTop: 22,
+    marginTop: vs(22),
   },
   subtitle: {
     fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    lineHeight: 24,
-    color: 'rgba(0,0,0,0.6)',
+    fontSize: fs(16),
+    lineHeight: fs(24),
+    color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: vs(4),
   },
 
   card: {
     backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: s(12),
+    padding: s(16),
     ...Shadow.md,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: vs(16),
   },
   cardTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 20,
-    lineHeight: 28,
-    color: '#1E293B',
+    fontSize: fs(20),
+    lineHeight: fs(28),
+    color: Colors.textPrimary,
   },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#2E7D32',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: s(4),
+    backgroundColor: Colors.success,
+    paddingHorizontal: s(10),
+    paddingVertical: vs(4),
+    borderRadius: s(8),
   },
   statusText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.white,
   },
 
-  field: { marginBottom: 16 },
+  field: { marginBottom: vs(16) },
   fieldLabel: {
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    lineHeight: 22,
-    color: 'rgba(0,0,0,0.6)',
-    marginBottom: 4,
+    fontSize: fs(14),
+    lineHeight: fs(22),
+    color: Colors.textSecondary,
+    marginBottom: vs(4),
   },
   fieldValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: s(8),
   },
   fieldValue: {
     fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#1E293B',
+    fontSize: fs(16),
+    lineHeight: fs(24),
+    color: Colors.textPrimary,
     flex: 1,
+    flexShrink: 1,
   },
   fieldValueLight: {
     fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#1E293B',
+    fontSize: fs(16),
+    lineHeight: fs(24),
+    color: Colors.textPrimary,
   },
   fieldValueBold: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#1E293B',
+    fontSize: fs(16),
+    lineHeight: fs(24),
+    color: Colors.textPrimary,
   },
   seatValue: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 20,
-    lineHeight: 28,
-    color: '#1E293B',
+    fontSize: fs(20),
+    lineHeight: fs(28),
+    color: Colors.textPrimary,
   },
   fareValue: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: fs(20),
+    lineHeight: fs(28),
     color: Colors.primary,
   },
 
   trackBtn: {
-    backgroundColor: 'rgba(0,0,0,0.12)',
-    borderRadius: 16,
-    height: 48,
+    backgroundColor: Colors.primary,
+    borderRadius: s(16),
+    height: vs(48),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: vs(24),
   },
   trackText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: 'rgba(0,0,0,0.26)',
+    fontSize: fs(14),
+    color: Colors.white,
   },
   cancelBtn: {
     borderWidth: 1.2,
-    borderColor: 'rgba(255,107,107,0.5)',
-    borderRadius: 16,
-    height: 50,
+    borderColor: alpha(Colors.error, 0.5),
+    borderRadius: s(16),
+    height: vs(50),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: vs(16),
   },
   cancelText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#FF6B6B',
+    fontSize: fs(14),
+    color: Colors.error,
   },
 
   reminderBanner: {
-    backgroundColor: '#33ABC2',
-    borderRadius: 24,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    marginTop: 24,
+    backgroundColor: Colors.primary,
+    borderRadius: s(24),
+    paddingVertical: vs(16),
+    paddingHorizontal: s(16),
+    marginTop: vs(24),
     alignItems: 'center',
   },
   reminderText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: fs(14),
+    lineHeight: fs(20),
     color: Colors.white,
     textAlign: 'center',
   },
@@ -443,17 +443,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    marginTop: 18,
-    paddingVertical: 8,
+    gap: s(4),
+    marginTop: vs(18),
+    paddingVertical: vs(8),
   },
   viewTicketText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.primary,
   },
-  // Matches MainNavigator's tabBarStyle (backgroundCard, divider border,
-  // 6px top padding) so it's visually identical to the home navbar.
   navbar: {
     position: 'absolute',
     left: 0,
@@ -464,17 +462,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundCard,
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
-    paddingTop: 6,
+    paddingTop: vs(6),
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: vs(2),
   },
   navLabel: {
     fontFamily: 'Inter-Medium',
-    fontSize: 11,
+    fontSize: fs(11),
     color: Colors.tabInactive,
   },
 });

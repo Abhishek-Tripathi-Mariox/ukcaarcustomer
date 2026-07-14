@@ -16,7 +16,10 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 import { Platform } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
+import { Colors, Typography, Spacing, BorderRadius, alpha } from '@/theme';
+
+// ... other imports ...
 
 const LOCATION_PERMISSION =
   Platform.OS === 'ios'
@@ -63,10 +66,10 @@ export const EnableLocationScreen: React.FC<EnableLocationScreenProps> = ({
       <View style={styles.mapBackground}>
         <View style={styles.mapGrid}>
           {Array.from({ length: 20 }).map((_, i) => (
-            <View key={`h${i}`} style={[styles.mapLineH, { top: i * 40 }]} />
+            <View key={`h${i}`} style={[styles.mapLineH, { top: vs(i * 40) }]} />
           ))}
           {Array.from({ length: 12 }).map((_, i) => (
-            <View key={`v${i}`} style={[styles.mapLineV, { left: i * 40 }]} />
+            <View key={`v${i}`} style={[styles.mapLineV, { left: s(i * 40) }]} />
           ))}
         </View>
       </View>
@@ -78,7 +81,7 @@ export const EnableLocationScreen: React.FC<EnableLocationScreenProps> = ({
           <View style={styles.pulseOuter} />
           <View style={styles.pulseMiddle} />
           <View style={styles.iconCircle}>
-            <Ionicons name="location" size={32} color={Colors.primary} />
+            <Ionicons name="location" size={s(32)} color={Colors.primary} />
           </View>
         </View>
 
@@ -113,7 +116,7 @@ export const EnableLocationScreen: React.FC<EnableLocationScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E8F0F2',
+    backgroundColor: '#E8F0F2', // Keep background color specific for map
   },
   mapBackground: {
     ...StyleSheet.absoluteFillObject,
@@ -144,8 +147,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   iconContainer: {
-    width: 120,
-    height: 120,
+    width: s(120),
+    height: s(120),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing['2xl'],
@@ -153,53 +156,53 @@ const styles = StyleSheet.create({
   },
   pulseOuter: {
     position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: s(120),
+    height: s(120),
+    borderRadius: s(60),
     backgroundColor: Colors.primaryMuted,
   },
   pulseMiddle: {
     position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(0, 151, 179, 0.15)',
+    width: s(90),
+    height: s(90),
+    borderRadius: s(45),
+    backgroundColor: alpha(Colors.primary, 0.15),
   },
   iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: s(60),
+    height: s(60),
+    borderRadius: s(30),
     backgroundColor: Colors.backgroundWhite,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: Colors.primary,
-    shadowColor: '#000',
+    shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
   title: {
-    fontSize: 30,
-    fontWeight: '800',
-    lineHeight: 40,
-    color: Colors.black,
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(30),
+    lineHeight: fs(40),
+    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: Spacing.md,
   },
   subtitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#7D8A95',
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: fs(24),
     letterSpacing: 0,
     marginBottom: Spacing['3xl'],
   },
   ctaButton: {
     width: '100%',
-    height: 58,
+    height: vs(58),
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.button,
     alignItems: 'center',
@@ -207,17 +210,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.base,
   },
   ctaText: {
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 24,
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(18),
+    lineHeight: fs(24),
     color: Colors.textOnPrimary,
   },
   skipButton: {
     paddingVertical: Spacing.md,
   },
   skipText: {
-    fontSize: 16,
-    fontWeight: '400',
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(16),
     color: Colors.termsMuted,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import MapView, {
 } from 'react-native-maps';
 import { useDispatch, useSelector } from 'react-redux';
 import { Colors, Shadow } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { CabIcon } from '@/components/icons/HomeIcons';
 import { AppDispatch, RootState } from '@/store';
 import {
@@ -27,6 +28,7 @@ import {
 } from '@/store/slices/rideSlice';
 import { connectSocket, setSocketListeners } from '@/services/socketService';
 import { driverService, NearbyDriver } from '@/services/driverService';
+import { rideService } from '@/services/rideService';
 
 const pinGif = require('../../../assets/select-ride/pin.gif');
 
@@ -233,9 +235,54 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
     };
   }, []);
 
-  // Forward-navigate as soon as a driver is assigned. We watch both the
-  // dedicated socket callback and the Redux store (populated by the
-  // App-level SocketBridge), whichever wins.
+  // Navigate to live tracking for an assigned ride. Shared by the socket
+  // `onDriverAssigned` push and the REST poll below, so an assignment is
+  // picked up even when the socket event never reaches this client (e.g. our
+  // socket is on a different backend instance than the one that handled the
+  // accept). Guarded by navigatedRef so whichever path wins fires exactly once.
+  const navigateToTracking = useCallback(
+    (ride: any) => {
+      if (navigatedRef.current || !ride) return;
+      if (createdRideId && String(ride._id) !== createdRideId) return;
+      navigatedRef.current = true;
+      dispatch(setCurrentRide(ride));
+      const driverInfo = ride.driver || {};
+      const dp = driverInfo.driverProfile || {};
+      const carBits = [dp.vehicleColor, dp.vehicleMake, dp.vehicleModel]
+        .filter(Boolean)
+        .join(' ');
+      navigation.replace('RideTracking', {
+        rideId: String(ride._id),
+        pickup: ride.pickup?.address ?? pickup,
+        dropoff: ride.dropoff?.address ?? dropoff,
+        rideType,
+        fare: ride.estimatedFare,
+        distance: ride.estimatedDistance,
+        duration: ride.estimatedDuration,
+        // Real backend-issued 4-digit PIN that the passenger reads to
+        // the driver. Falls back to undefined; RideTracking shows '----'.
+        otp: ride.pickupOtp,
+        driver: {
+          id: String(driverInfo._id ?? ''),
+          name:
+            [driverInfo.firstName, driverInfo.lastName]
+              .filter(Boolean)
+              .join(' ') || 'Driver',
+          phone: driverInfo.phone ?? '',
+          rating: dp.rating ?? 5.0,
+          car: carBits || 'Vehicle',
+          plate: dp.plateNumber ?? '',
+          trips: dp.totalTrips ?? 0,
+          avatar: driverInfo.avatar ?? null,
+        },
+      });
+    },
+    [createdRideId, navigation, pickup, dropoff, rideType, dispatch],
+  );
+
+  // Forward-navigate as soon as a driver is assigned (socket push path). We
+  // also poll REST below as a fallback, and watch the Redux store (populated
+  // by the App-level SocketBridge) — whichever wins first.
   useEffect(() => {
     setSocketListeners({
       // Server-side cancel (admin / driver / 5-minute auto-cancel). We pop
@@ -254,44 +301,53 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
           { cancelable: false },
         );
       },
-      onDriverAssigned: ({ ride }) => {
-        if (navigatedRef.current) return;
-        if (!ride) return;
-        if (createdRideId && String(ride._id) !== createdRideId) return;
-        navigatedRef.current = true;
-        dispatch(setCurrentRide(ride));
-        const driverInfo = ride.driver || {};
-        const dp = driverInfo.driverProfile || {};
-        const carBits = [dp.vehicleColor, dp.vehicleMake, dp.vehicleModel]
-          .filter(Boolean)
-          .join(' ');
-        navigation.replace('RideTracking', {
-          rideId: String(ride._id),
-          pickup: ride.pickup?.address ?? pickup,
-          dropoff: ride.dropoff?.address ?? dropoff,
-          rideType,
-          fare: ride.estimatedFare,
-          distance: ride.estimatedDistance,
-          duration: ride.estimatedDuration,
-          // Real backend-issued 4-digit PIN that the passenger reads to
-          // the driver. Falls back to undefined; RideTracking shows '----'.
-          otp: ride.pickupOtp,
-          driver: {
-            id: String(driverInfo._id ?? ''),
-            name: [driverInfo.firstName, driverInfo.lastName]
-              .filter(Boolean)
-              .join(' ') || 'Driver',
-            phone: driverInfo.phone ?? '',
-            rating: dp.rating ?? 5.0,
-            car: carBits || 'Vehicle',
-            plate: dp.plateNumber ?? '',
-            trips: dp.totalTrips ?? 0,
-            avatar: driverInfo.avatar ?? null,
-          },
-        });
-      },
+      onDriverAssigned: ({ ride }) => navigateToTracking(ride),
     });
-  }, [createdRideId, navigation, pickup, dropoff, rideType, dispatch]);
+  }, [createdRideId, navigation, navigateToTracking]);
+
+  // REST fallback poll. The socket `ride:assigned` push only reaches us when
+  // our socket lives on the same backend instance that handled the driver's
+  // accept — in a multi-instance / split deployment it silently never arrives,
+  // which is exactly the "it says no driver, then a driver shows up" bug and
+  // the "driver came online mid-search but the app doesn't update" bug. Polling
+  // the shared ride state closes both: once the DB shows an assignment, we
+  // forward to tracking regardless of which instance handled it.
+  useEffect(() => {
+    if (!createdRideId) return;
+    const ASSIGNED = [
+      'driver_assigned',
+      'driver_arriving',
+      'driver_arrived',
+      'in_progress',
+    ];
+    let cancelled = false;
+    const poll = async () => {
+      if (navigatedRef.current) return;
+      try {
+        const ride: any = await rideService.getRide(createdRideId);
+        if (cancelled || navigatedRef.current || !ride) return;
+        if (ASSIGNED.includes(ride.status) && ride.driver) {
+          navigateToTracking(ride);
+        } else if (ride.status === 'cancelled' || ride.status === 'no_drivers') {
+          navigatedRef.current = true;
+          Alert.alert(
+            'Ride cancelled',
+            "We couldn't find a driver in time. Please try booking again.",
+            [{ text: 'OK', onPress: () => navigation.popToTop() }],
+            { cancelable: false },
+          );
+        }
+      } catch {
+        /* transient network error — the next tick retries */
+      }
+    };
+    const id = setInterval(poll, 4000);
+    poll();
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [createdRideId, navigateToTracking, navigation]);
 
   // Backup hand-off: if SocketBridge updates currentRide before our
   // screen-local listener fires (cold-start race), still navigate forward.
@@ -353,7 +409,7 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar hidden />
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       {/* ── Real Google Map — pickup pulse + live driver markers ── */}
       <View style={styles.mapSection}>
@@ -488,10 +544,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '40%',
     left: '50%',
-    marginLeft: -32,
-    marginTop: -32,
-    width: 64,
-    height: 64,
+    marginLeft: s(-32),
+    marginTop: vs(-32),
+    width: s(64),
+    height: s(64),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -502,34 +558,34 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -32,
-    marginTop: -32,
-    width: 64,
-    height: 64,
+    marginLeft: s(-32),
+    marginTop: vs(-32),
+    width: s(64),
+    height: s(64),
     alignItems: 'center',
     justifyContent: 'center',
   },
   pulseRing: {
     position: 'absolute',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: s(64),
+    height: s(64),
+    borderRadius: s(32),
     borderWidth: 2,
     borderColor: 'rgba(0, 151, 179, 0.45)',
     backgroundColor: 'rgba(0, 151, 179, 0.08)',
   },
   centerCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: s(56),
+    height: s(56),
+    borderRadius: s(28),
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadow.md,
   },
   pinImage: {
-    width: 36,
-    height: 36,
+    width: s(36),
+    height: s(36),
   },
   cabMarker: {
     position: 'absolute',
@@ -537,21 +593,21 @@ const styles = StyleSheet.create({
 
   /* ── Status ── */
   statusSection: {
-    paddingVertical: 24,
+    paddingVertical: vs(24),
     alignItems: 'center',
     backgroundColor: Colors.white,
   },
   statusTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: fs(18),
+    lineHeight: fs(24),
     color: Colors.textPrimary,
-    marginBottom: 6,
+    marginBottom: vs(6),
   },
   statusSubtitle: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: fs(14),
+    lineHeight: fs(20),
     color: Colors.textSecondary,
   },
   divider: {
@@ -561,31 +617,31 @@ const styles = StyleSheet.create({
 
   /* ── Connecting ── */
   connectingSection: {
-    paddingVertical: 22,
-    paddingHorizontal: 32,
+    paddingVertical: vs(22),
+    paddingHorizontal: s(32),
     alignItems: 'center',
     backgroundColor: Colors.white,
   },
   connectingText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: fs(14),
+    lineHeight: fs(20),
     color: Colors.textSecondary,
     textAlign: 'center',
   },
   carEmoji: {
-    fontSize: 16,
+    fontSize: fs(16),
   },
 
   /* ── Cancel ── */
   cancelSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    paddingTop: 8,
+    paddingHorizontal: s(20),
+    paddingBottom: vs(32),
+    paddingTop: vs(8),
   },
   cancelButton: {
-    height: 56,
-    borderRadius: 12,
+    height: vs(56),
+    borderRadius: s(12),
     borderWidth: 1.5,
     borderColor: Colors.error,
     alignItems: 'center',
@@ -594,8 +650,8 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: fs(16),
+    lineHeight: fs(22),
     color: Colors.error,
   },
 });

@@ -11,6 +11,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,7 +22,8 @@ import {
   launchImageLibrary,
   type ImagePickerResponse,
 } from 'react-native-image-picker';
-import { Colors, Typography, Spacing, BorderRadius } from '@/theme';
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { KeyboardAwareScrollView } from '@/components/common';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateProfile, uploadAvatar } from '@/store/slices/authSlice';
@@ -40,8 +43,7 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
   const dispatch = useAppDispatch();
   const { loading } = useAppSelector((state) => state.auth);
   
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [selectedPreference, setSelectedPreference] = useState<RidePreference>('Comfort');
   const [showWelcome, setShowWelcome] = useState(false);
@@ -50,8 +52,39 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
 
   const preferences: RidePreference[] = ['Comfort', 'Economy', 'Premium'];
 
+  const requestCameraPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') return true;
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'Camera Permission',
+          message: 'This app needs access to your camera to take a profile picture.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn('[CameraPermission] error:', err);
+      return false;
+    }
+  };
+
   const launchPicker = async (source: 'camera' | 'gallery') => {
     try {
+      if (source === 'camera') {
+        const hasPermission = await requestCameraPermission();
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Denied',
+            'Camera permission is required to take a photo.'
+          );
+          return;
+        }
+      }
+
       const launch = source === 'camera' ? launchCamera : launchImageLibrary;
 
       const result: ImagePickerResponse = await launch({
@@ -95,7 +128,8 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
   };
 
   const handleSave = async () => {
-    if (firstName.trim().length === 0) return;
+    const trimmedName = fullName.trim();
+    if (trimmedName.length === 0) return;
 
     setError(null);
     setSaving(true);
@@ -106,10 +140,21 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
         await dispatch(uploadAvatar(avatarUri)).unwrap();
       }
 
+      // Split at the first space
+      const spaceIndex = trimmedName.indexOf(' ');
+      let parsedFirstName = '';
+      let parsedLastName = '';
+      if (spaceIndex === -1) {
+        parsedFirstName = trimmedName;
+      } else {
+        parsedFirstName = trimmedName.slice(0, spaceIndex).trim();
+        parsedLastName = trimmedName.slice(spaceIndex + 1).trim();
+      }
+
       // Update profile
       await dispatch(updateProfile({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: parsedFirstName,
+        lastName: parsedLastName,
       })).unwrap();
 
       // Ride preference has no backend field yet — persist it locally so the
@@ -148,46 +193,32 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
               ) : (
-                <Ionicons name="person-outline" size={40} color={Colors.primary} />
+                <Ionicons name="person-outline" size={s(40)} color={Colors.primary} />
               )}
             </View>
             <View style={styles.cameraButton}>
-              <Ionicons name="camera" size={18} color={Colors.textOnPrimary} />
+              <Ionicons name="camera" size={s(18)} color={Colors.textOnPrimary} />
             </View>
           </View>
           <Text style={styles.avatarHint}>Tap to add photo</Text>
         </TouchableOpacity>
 
-        {/* First Name */}
-        <Text style={styles.inputLabel}>First Name</Text>
+        {/* Full Name */}
+        <Text style={styles.inputLabel}>Full Name</Text>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
-            placeholder="Enter your first name"
+            placeholder="Enter your full name"
             placeholderTextColor={Colors.termsMuted}
-            value={firstName}
-            onChangeText={setFirstName}
-            selectionColor={Colors.primary}
-            autoCapitalize="words"
-          />
-        </View>
-
-        {/* Last Name */}
-        <Text style={styles.inputLabel}>Last Name</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter your last name"
-            placeholderTextColor={Colors.termsMuted}
-            value={lastName}
-            onChangeText={setLastName}
+            value={fullName}
+            onChangeText={setFullName}
             selectionColor={Colors.primary}
             autoCapitalize="words"
           />
         </View>
 
         {/* Ride Preference */}
-        <Text style={styles.inputLabel}>Ride Preference</Text>
+        <Text style={[styles.inputLabel, { fontFamily: FontFamily.bold, fontWeight: '700' }]}>Ride Preference</Text>
         <View style={styles.preferenceRow}>
           {preferences.map((pref) => (
             <TouchableOpacity
@@ -215,9 +246,9 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
 
         {/* Save & Continue */}
         <TouchableOpacity
-          style={[styles.ctaButton, (!firstName.trim() || saving) && styles.ctaButtonDisabled]}
+          style={[styles.ctaButton, (!fullName.trim() || saving) && styles.ctaButtonDisabled]}
           onPress={handleSave}
-          disabled={!firstName.trim() || saving}
+          disabled={!fullName.trim() || saving}
           activeOpacity={0.85}
         >
           {saving ? (
@@ -239,11 +270,11 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
           <View style={styles.modalContent}>
             {/* Checkmark */}
             <View style={styles.checkCircle}>
-              <Ionicons name="checkmark" size={40} color={Colors.primary} />
+              <Ionicons name="checkmark" size={s(40)} color={Colors.primary} />
             </View>
 
             <Text style={styles.welcomeTitle}>
-              Welcome, {firstName.trim()}
+              Welcome, {fullName.trim().split(' ')[0]}
             </Text>
             <Text style={styles.welcomeSubtitle}>Your profile is all set.</Text>
 
@@ -271,19 +302,19 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing['3xl'],
   },
   title: {
-    fontSize: 30,
-    fontWeight: '800',
-    lineHeight: 40,
-    color: Colors.black,
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(30),
+    lineHeight: fs(40),
+    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: Spacing.md,
   },
   subtitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#7D8A95',
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(16),
+    color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: fs(24),
     letterSpacing: 0,
     marginBottom: Spacing['2xl'],
   },
@@ -292,14 +323,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing['2xl'],
   },
   avatarWrapper: {
-    width: 131,
-    height: 131,
+    width: s(131),
+    height: s(131),
     position: 'relative',
   },
   avatarCircle: {
-    width: 131,
-    height: 131,
-    borderRadius: 66,
+    width: s(131),
+    height: s(131),
+    borderRadius: s(66),
     backgroundColor: Colors.primaryMuted,
     borderWidth: 2,
     borderColor: Colors.primary,
@@ -310,20 +341,21 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 66,
+    borderRadius: s(66),
   },
   avatarHint: {
     ...Typography.caption,
-    color: Colors.textSecondaryFigma,
+    fontFamily: 'Inter-Regular',
+    color: Colors.textSecondary,
     marginTop: Spacing.sm,
   },
   cameraButton: {
     position: 'absolute',
-    bottom: 5,
-    right: 5,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    bottom: vs(5),
+    right: s(5),
+    width: s(42),
+    height: s(42),
+    borderRadius: s(21),
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -332,7 +364,8 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     ...Typography.label,
-    color: Colors.textSecondaryFigma,
+    fontFamily: 'Inter-Medium',
+    color: Colors.textSecondary,
     marginBottom: Spacing.sm,
   },
   inputContainer: {
@@ -344,9 +377,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderLight,
     paddingHorizontal: Spacing.base,
-    height: 50,
+    height: vs(50),
     ...Typography.bodyLarge,
-    color: Colors.textOnLight,
+    fontFamily: 'Inter-Regular',
+    color: Colors.textPrimary,
   },
   preferenceRow: {
     flexDirection: 'row',
@@ -355,7 +389,7 @@ const styles = StyleSheet.create({
   },
   preferenceChip: {
     flex: 1,
-    height: 60,
+    height: vs(60),
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: BorderRadius.base,
@@ -369,20 +403,22 @@ const styles = StyleSheet.create({
   },
   preferenceText: {
     ...Typography.label,
-    color: Colors.textSecondaryFigma,
+    fontFamily: 'Inter-Medium',
+    color: Colors.textSecondary,
   },
   preferenceTextActive: {
     color: Colors.primary,
   },
   errorText: {
     ...Typography.caption,
+    fontFamily: 'Inter-Regular',
     color: Colors.error,
     textAlign: 'center',
     marginBottom: Spacing.md,
   },
   ctaButton: {
     width: '100%',
-    height: 58,
+    height: vs(58),
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.button,
     alignItems: 'center',
@@ -392,9 +428,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   ctaText: {
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 24,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(18),
+    lineHeight: fs(24),
     color: Colors.textOnPrimary,
   },
   // Modal
@@ -405,7 +441,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalContent: {
-    width: width - 64,
+    width: width - s(64),
     backgroundColor: Colors.backgroundWhite,
     borderRadius: BorderRadius.xl,
     paddingVertical: Spacing['3xl'],
@@ -413,9 +449,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: s(80),
+    height: s(80),
+    borderRadius: s(40),
     borderWidth: 3,
     borderColor: Colors.primary,
     alignItems: 'center',
@@ -423,22 +459,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   welcomeTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    lineHeight: 34,
-    color: Colors.textOnLight,
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(26),
+    lineHeight: fs(34),
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   welcomeSubtitle: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#7D8A95',
-    lineHeight: 24,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(16),
+    color: Colors.textSecondary,
+    lineHeight: fs(24),
     marginBottom: Spacing['2xl'] - 4,
   },
   modalButton: {
     width: '100%',
-    height: 48,
+    height: vs(48),
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.button,
     alignItems: 'center',
@@ -446,7 +482,7 @@ const styles = StyleSheet.create({
   },
   modalButtonText: {
     ...Typography.button,
-    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
     color: Colors.textOnPrimary,
   },
 });

@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius } from '@/theme';
@@ -269,63 +270,63 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
+    paddingHorizontal: s(Spacing.base), paddingVertical: vs(Spacing.md),
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  content: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing['3xl'] },
+  backBtn: { width: s(36), height: s(36), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-Bold', fontSize: fs(20), color: '#1E293B' },
+  content: { paddingHorizontal: s(Spacing.xl), paddingBottom: vs(Spacing['3xl']) },
 
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.black, marginTop: Spacing.xl, marginBottom: Spacing.md },
-  sectionDesc: { fontSize: 14, color: '#7D8A95', marginBottom: Spacing.md, lineHeight: 20 },
+  sectionTitle: { fontFamily: 'Inter-Bold', fontSize: fs(18), color: '#1E293B', marginTop: vs(Spacing.xl), marginBottom: vs(Spacing.md) },
+  sectionDesc: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#7D8A95', marginBottom: vs(Spacing.md), lineHeight: fs(20) },
 
   // Support
   supportRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    paddingVertical: vs(16), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
   supportIcon: {
-    width: 48, height: 48, borderRadius: 24,
+    width: s(48), height: s(48), borderRadius: s(24),
     alignItems: 'center', justifyContent: 'center',
   },
   supportInfo: { flex: 1 },
-  supportLabel: { fontSize: 16, fontWeight: '600', color: Colors.black },
-  supportDesc: { fontSize: 13, color: '#7D8A95', marginTop: 2 },
+  supportLabel: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.black },
+  supportDesc: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#7D8A95', marginTop: vs(2) },
 
   // Search
   searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#F5F5F5', borderRadius: BorderRadius.base,
-    height: 44, paddingHorizontal: Spacing.md, marginBottom: Spacing.md,
+    flexDirection: 'row', alignItems: 'center', gap: s(8),
+    backgroundColor: '#F5F5F5', borderRadius: s(BorderRadius.base),
+    height: vs(44), paddingHorizontal: s(Spacing.md), marginBottom: vs(Spacing.md),
   },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.black, paddingVertical: 0 },
+  searchInput: { flex: 1, fontFamily: 'Inter-Regular', fontSize: fs(15), color: Colors.black, paddingVertical: 0 },
 
   // FAQ
   faqItem: {
     borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-    paddingVertical: 16,
+    paddingVertical: vs(16),
   },
   faqHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  faqQuestion: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.black, paddingRight: 8 },
+  faqQuestion: { flex: 1, fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.black, paddingRight: s(8) },
   faqAnswer: {
-    fontSize: 14, color: '#7D8A95', lineHeight: 22,
-    marginTop: 10, paddingRight: 24,
+    fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#7D8A95', lineHeight: fs(22),
+    marginTop: vs(10), paddingRight: s(24),
   },
 
-  noResults: { alignItems: 'center', paddingVertical: Spacing.xl },
-  noResultsText: { fontSize: 14, color: '#B0B0B0' },
+  noResults: { alignItems: 'center', paddingVertical: vs(Spacing.xl) },
+  noResultsText: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#B0B0B0' },
 
   // Report — minHeight (not a fixed height) so the box grows as the user
   // types multiple lines instead of hiding text beyond the first lines.
   reportInput: {
-    minHeight: 120, borderWidth: 1, borderColor: '#E0E0E0', borderRadius: BorderRadius.base,
-    paddingHorizontal: Spacing.base, paddingTop: Spacing.md, paddingBottom: Spacing.md,
-    fontSize: 15, color: Colors.black,
+    minHeight: vs(120), borderWidth: 1, borderColor: '#E0E0E0', borderRadius: s(BorderRadius.base),
+    paddingHorizontal: s(Spacing.base), paddingTop: vs(Spacing.md), paddingBottom: vs(Spacing.md),
+    fontFamily: 'Inter-Regular', fontSize: fs(15), color: Colors.black,
   },
   reportBtn: {
-    height: 56, backgroundColor: Colors.primary, borderRadius: BorderRadius.button,
-    alignItems: 'center', justifyContent: 'center', marginTop: Spacing.lg,
+    height: vs(56), backgroundColor: Colors.primary, borderRadius: s(BorderRadius.button),
+    alignItems: 'center', justifyContent: 'center', marginTop: vs(Spacing.lg),
   },
-  reportBtnText: { fontSize: 18, fontWeight: '600', color: '#fff' },
+  reportBtnText: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: '#fff' },
 });

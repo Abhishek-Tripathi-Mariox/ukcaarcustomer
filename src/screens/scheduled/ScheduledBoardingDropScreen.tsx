@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Shadow } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { istDateStr, istMinutesOfDay } from '@/utils/date';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
 import { fmt12h } from './ScheduledRouteScreen';
@@ -335,8 +336,8 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.routeBanner}>
-            <Text style={styles.routeBannerTitle}>{scheduledRoute.name}</Text>
-            <Text style={styles.routeBannerSub}>
+            <Text style={styles.routeBannerTitle} numberOfLines={2}>{scheduledRoute.name}</Text>
+            <Text style={styles.routeBannerSub} numberOfLines={2}>
               {scheduledRoute.from} → {scheduledRoute.to}
             </Text>
           </View>
@@ -449,57 +450,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.white, flex: 1, textAlign: 'center' },
-  content: { padding: 16, paddingBottom: 120 },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.white, flex: 1, textAlign: 'center' },
+  content: { padding: s(16), paddingBottom: vs(120) },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: s(24) },
 
   routeBanner: {
     backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
+    borderRadius: s(12),
+    padding: s(14),
+    marginBottom: vs(16),
     borderWidth: 1,
     borderColor: Colors.borderLight,
   },
   routeBannerTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: Colors.textPrimary,
   },
   routeBannerSub: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.textSecondary,
-    marginTop: 2,
+    marginTop: vs(2),
   },
 
-  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  sectionTitle: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.textPrimary },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: vs(12) },
+  sectionTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.textPrimary },
 
   stopCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: s(12),
     backgroundColor: Colors.white,
-    borderRadius: 12,
+    borderRadius: s(12),
     borderWidth: 1.5,
     borderColor: Colors.borderLight,
-    padding: 14,
-    marginBottom: 10,
+    padding: s(14),
+    marginBottom: vs(10),
     ...Shadow.sm,
   },
   stopCardActive: {
     borderColor: Colors.primary,
-    backgroundColor: 'rgba(0, 200, 83, 0.04)',
+    backgroundColor: alpha(Colors.success, 0.04),
   },
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: s(20),
+    height: s(20),
+    borderRadius: s(10),
     borderWidth: 1.5,
     borderColor: Colors.border,
     alignItems: 'center',
@@ -509,13 +510,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.success,
     borderColor: Colors.success,
   },
-  stopName: { fontFamily: 'Inter-SemiBold', fontSize: 15, color: Colors.textPrimary },
-  stopTime: { fontFamily: 'Inter-Regular', fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  stopName: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.textPrimary, flexShrink: 1 },
+  stopTime: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: Colors.textMuted, marginTop: vs(2) },
   stopTimeBold: { fontFamily: 'Inter-SemiBold', color: Colors.textPrimary },
   checkBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
     backgroundColor: Colors.success,
     alignItems: 'center',
     justifyContent: 'center',
@@ -523,37 +524,37 @@ const styles = StyleSheet.create({
 
   helperText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.textMuted,
     textAlign: 'center',
-    marginTop: 16,
-    paddingHorizontal: 12,
+    marginTop: vs(16),
+    paddingHorizontal: s(12),
   },
 
-  chipRow: { gap: 8, paddingVertical: 2, paddingRight: 8 },
+  chipRow: { gap: s(8), paddingVertical: vs(2), paddingRight: s(8) },
   dateChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(10),
+    borderRadius: s(12),
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.white,
   },
   timeChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(10),
+    borderRadius: s(12),
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.white,
   },
   chipSelected: {
     borderColor: Colors.primary,
-    backgroundColor: 'rgba(0,151,179,0.08)',
+    backgroundColor: alpha(Colors.primary, 0.08),
   },
   chipText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.textPrimary,
   },
   chipTextSelected: {
@@ -566,17 +567,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 16,
+    padding: s(16),
     backgroundColor: Colors.backgroundCard,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
   cta: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(8),
+    height: vs(56),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.white },
+  ctaText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.white },
 });

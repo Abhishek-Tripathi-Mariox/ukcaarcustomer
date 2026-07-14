@@ -90,7 +90,7 @@ export const routeService = {
        *  anywhere in pincode 207123). */
       pickupPincode?: string;
       dropPincode?: string;
-    } = { hasApprovedDriver: true },
+    } = { hasApprovedDriver: false },
   ): Promise<ScheduledRouteApi[]> => {
     const params: Record<string, string> = {};
     if (opts.hasApprovedDriver) params.hasApprovedDriver = 'true';

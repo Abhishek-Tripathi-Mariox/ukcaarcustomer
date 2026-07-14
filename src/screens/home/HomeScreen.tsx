@@ -37,6 +37,7 @@ import {
   CarIcon,
   CalendarClockIcon,
   CabIcon,
+  MenuIcon,
 } from '@/components/icons/HomeIcons';
 import { BookingRideForSheet } from './BookingRideForSheet';
 import { PickupPickerSheet } from './PickupPickerSheet';
@@ -55,6 +56,7 @@ interface HomeScreenProps {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const headerHeight = insets.top + 70;
   const [activeTab, setActiveTab] = useState<RideTab>('instant');
   const [showRiderSheet, setShowRiderSheet] = useState(false);
   // Inline pickup picker — replaces the old SelectLocation full-screen
@@ -620,29 +622,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar hidden />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* ── Teal Top Bar ── */}
-      <View style={[styles.topBar, { paddingTop: Spacing.md }]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <View style={styles.topBarInner}>
           {/* Menu + Greeting */}
           <View style={styles.topLeft}>
             <TouchableOpacity
-              style={styles.menuButton}
               activeOpacity={0.8}
               onPress={() => navigation.navigate('Account')}
             >
-              {user?.avatar ? (
-                <Image
-                  source={{ uri: user.avatar }}
-                  style={styles.menuAvatar}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.menuInitialsCircle}>
-                  <Text style={styles.menuInitialsText}>{initials}</Text>
-                </View>
-              )}
+              <MenuIcon size={46} color={Colors.white} />
             </TouchableOpacity>
             <View style={styles.greetingBlock}>
               <View style={styles.greetingRow}>
@@ -654,23 +645,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text style={styles.userName}>{firstName}</Text>
             </View>
           </View>
-          {/* Right cluster: notifications + wallet */}
+          {/* Right cluster: wallet */}
           <View style={styles.topRight}>
-            {/* Notification bell with live unread count */}
-            <TouchableOpacity
-              style={styles.notifButton}
-              onPress={() => navigation.navigate('Notifications')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="notifications-outline" size={22} color={Colors.white} />
-              {notificationCount > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>
-                    {notificationCount > 99 ? '99+' : notificationCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
             {/* Wallet Badge */}
             <TouchableOpacity style={styles.walletBadge} onPress={() => navigation.navigate('WalletTopUp')} activeOpacity={0.85}>
               <Ionicons name="wallet-outline" size={16} color={Colors.primary} />
@@ -695,7 +671,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View
         style={[
           styles.mapContainer,
-          { top: 90 },
+          { top: headerHeight },
           isScheduled && { display: 'none' as const },
         ]}
       >
@@ -770,7 +746,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View
         style={[
           styles.bottomSheet,
-          isScheduled && { top: 90 },
+          isScheduled && { top: headerHeight },
         ]}
       >
         <ScrollView
@@ -799,10 +775,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 onPress={() => setActiveTab(key)}
                 activeOpacity={0.7}
               >
-                <View style={{ marginRight: 6 }}>
+                <View style={{ marginRight: 5 }}>
                   <Icon size={16} color={iconColor} />
                 </View>
-                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                <Text
+                  style={[styles.tabLabel, isActive && styles.tabLabelActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -1437,7 +1418,7 @@ const styles = StyleSheet.create({
   /* ── Tabs ── */
   tabRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     marginBottom: Spacing.lg,
   },
   tab: {
@@ -1445,8 +1426,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 4,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.borderDark,
@@ -1457,9 +1438,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   tabLabel: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    lineHeight: 23,
+    fontFamily: 'Inter-Medium',
+    fontSize: 13.5,
+    lineHeight: 18,
     color: Colors.borderDark,
   },
   tabLabelActive: {
@@ -1690,7 +1671,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   routeName: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: 'Inter-SemiBold',
     fontSize: 24,
     lineHeight: 30,
     color: Colors.textPrimary,
@@ -1705,7 +1686,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   routeStopText: {
-    fontFamily: 'Poppins-Light',
+    fontFamily: 'Inter-Light',
     fontSize: 14,
     lineHeight: 20,
     color: Colors.textPrimary,
@@ -1733,13 +1714,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   routeMetricLabel: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: 'Inter-Regular',
     fontSize: 12,
     lineHeight: 16,
     color: '#000000',
   },
   routeMetricValue: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     lineHeight: 22,
     color: Colors.textPrimary,
@@ -1752,7 +1733,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   routeNextDeparture: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: 'Inter-SemiBold',
     fontSize: 15,
     lineHeight: 22,
     color: Colors.textPrimary,

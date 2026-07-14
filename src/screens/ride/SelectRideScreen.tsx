@@ -18,6 +18,7 @@ import MapView, {
 } from 'react-native-maps';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Colors, Shadow } from '@/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { estimateFare, setSelectedVehicle } from '@/store/slices/rideSlice';
 import { FlashIcon, CabIcon } from '@/components/icons/HomeIcons';
@@ -26,6 +27,7 @@ import { ClockSmallIcon, UserCircleSmallIcon } from '@/components/icons/RideIcon
 import { rideService, NearbyVehicleType } from '@/services/rideService';
 import { driverService, NearbyDriver } from '@/services/driverService';
 import { geoService, GeoDirections } from '@/services/geoService';
+import { fs, s, vs } from '@/theme/responsive';
 
 const motorbikePng = require('../../../assets/select-ride/motorbike.png');
 const autoPng = require('../../../assets/select-ride/auto.png');
@@ -82,6 +84,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
   route,
 }) => {
   const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
   const { pickup: pickupLoc, dropoff: dropoffLoc, estimateData, loading } =
     useAppSelector((s) => s.ride);
   const { pickup, dropoff } = route.params;
@@ -284,7 +287,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar hidden />
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       {/* ── Real Google Map ── */}
       <View style={styles.mapSection}>
@@ -360,7 +363,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
 
         {/* Back button */}
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, { top: insets.top + vs(10) }]}
           onPress={() => navigation.goBack()}
           activeOpacity={0.85}
         >
@@ -444,7 +447,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
           </ScrollView>
         )}
 
-        <View style={styles.bookSection}>
+        <View style={[styles.bookSection, { paddingBottom: insets.bottom + 24 }]}>
           {!!selectedEstimate?.loyaltyDiscount && selectedEstimate.loyaltyDiscount > 0 && (
             <View style={styles.rewardBanner}>
               <Text style={styles.rewardBannerText}>
@@ -459,7 +462,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
             activeOpacity={0.85}
           >
             <FlashIcon size={18} color={Colors.white} />
-            <Text style={styles.bookText}>Book CAAR</Text>
+            <Text style={styles.bookText}>Book Cab</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -481,9 +484,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   pickupMarker: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
     backgroundColor: Colors.white,
     borderWidth: 3,
     borderColor: Colors.primary,
@@ -491,15 +494,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pickupMarkerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: s(8),
+    height: s(8),
+    borderRadius: s(4),
     backgroundColor: Colors.primary,
   },
   dropMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: s(28),
+    height: s(28),
+    borderRadius: s(14),
     backgroundColor: '#3B5BDB',
     alignItems: 'center',
     justifyContent: 'center',
@@ -507,29 +510,28 @@ const styles = StyleSheet.create({
   },
   routeChip: {
     position: 'absolute',
-    top: 50,
+    top: vs(50),
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: s(6),
     backgroundColor: Colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 92,
+    paddingHorizontal: s(14),
+    paddingVertical: vs(7),
+    borderRadius: s(92),
     ...Shadow.sm,
   },
   routeChipText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.white,
   },
   backButton: {
     position: 'absolute',
-    top: 40,
-    left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    left: s(16),
+    width: s(40),
+    height: s(40),
+    borderRadius: s(20),
     backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
@@ -539,55 +541,55 @@ const styles = StyleSheet.create({
   /* ── Bottom Sheet ── */
   bottomSheet: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -20,
-    paddingTop: 12,
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: s(24),
+    borderTopRightRadius: s(24),
+    marginTop: vs(-20),
+    paddingTop: vs(12),
     ...Shadow.top,
   },
   sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+    width: s(40),
+    height: vs(4),
+    borderRadius: s(2),
     backgroundColor: '#D9D9D9',
     alignSelf: 'center',
-    marginBottom: 10,
+    marginBottom: vs(10),
   },
   sheetTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-    color: Colors.textPrimary,
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    fontSize: fs(16),
+    color: '#1E293B',
+    paddingHorizontal: s(20),
+    marginBottom: vs(8),
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    paddingTop: 4,
+    paddingHorizontal: s(20),
+    paddingBottom: vs(10),
+    paddingTop: vs(4),
   },
 
   availableText: {
-    marginTop: 2,
+    marginTop: vs(2),
     fontFamily: 'Inter-Regular',
-    fontSize: 11,
+    fontSize: fs(11),
     color: '#10B981',
   },
   loadingText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textMuted,
-    marginTop: 12,
+    marginTop: vs(12),
   },
 
   /* ── Ride Cards ── */
   rideCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
+    backgroundColor: Colors.white,
+    borderRadius: s(16),
+    padding: s(14),
+    marginBottom: vs(12),
     borderWidth: 1.5,
     borderColor: '#EAEAEA',
     position: 'relative',
@@ -597,9 +599,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 151, 179, 0.06)',
   },
   rideImageBox: {
-    width: 70,
-    height: 50,
-    marginRight: 14,
+    width: s(70),
+    height: vs(50),
+    marginRight: s(14),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -608,9 +610,9 @@ const styles = StyleSheet.create({
   },
   rideName: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: vs(4),
   },
   rideDetails: {
     flexDirection: 'row',
@@ -618,52 +620,52 @@ const styles = StyleSheet.create({
   },
   ridePrice: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textPrimary,
   },
   rideDetailText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.textMuted,
-    marginLeft: 4,
+    marginLeft: s(4),
   },
   radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
     borderWidth: 2,
     borderColor: '#D0D0D0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    marginLeft: s(8),
   },
   radioOuterSelected: {
     borderColor: Colors.primary,
   },
   radioInner: {
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
+    width: s(11),
+    height: s(11),
+    borderRadius: s(5.5),
     backgroundColor: Colors.primary,
   },
 
   /* ── Book Cab ── */
   bookSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    paddingTop: 10,
+    paddingHorizontal: s(20),
+    paddingBottom: vs(24),
+    paddingTop: vs(10),
   },
   rewardBanner: {
     backgroundColor: '#E8F5E9',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 10,
+    borderRadius: s(10),
+    paddingVertical: vs(8),
+    paddingHorizontal: s(12),
+    marginBottom: vs(10),
     alignItems: 'center',
   },
   rewardBannerText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(13),
     color: '#2E7D32',
   },
   bookButton: {
@@ -671,16 +673,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: 12,
-    height: 58,
-    gap: 10,
+    borderRadius: s(12),
+    height: vs(58),
+    gap: s(10),
   },
   bookButtonDisabled: {
     opacity: 0.5,
   },
   bookText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
+    fontSize: fs(18),
     color: Colors.white,
   },
 });

@@ -9,6 +9,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +19,8 @@ import {
   launchImageLibrary,
   type ImagePickerResponse,
 } from 'react-native-image-picker';
-import { Colors, Typography, Spacing, BorderRadius } from '@/theme';
+import { Typography, Colors, Spacing, BorderRadius } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { KeyboardAwareScrollView } from '@/components/common';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateProfile, uploadAvatar } from '@/store/slices/authSlice';
@@ -31,15 +34,45 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
 
-  const [firstName, setFirstName] = useState(user?.firstName || '');
-  const [lastName, setLastName] = useState(user?.lastName || '');
+  const [fullName, setFullName] = useState([user?.firstName, user?.lastName].filter(Boolean).join(' '));
   const [email, setEmail] = useState(user?.email || '');
   const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar || null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const requestCameraPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') return true;
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'Camera Permission',
+          message: 'This app needs access to your camera to take a profile picture.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn('[CameraPermission] error:', err);
+      return false;
+    }
+  };
+
   const launchPicker = async (source: 'camera' | 'gallery') => {
     try {
+      if (source === 'camera') {
+        const hasPermission = await requestCameraPermission();
+        if (!hasPermission) {
+          Alert.alert(
+            'Permission Denied',
+            'Camera permission is required to take a photo.'
+          );
+          return;
+        }
+      }
+
       const launch = source === 'camera' ? launchCamera : launchImageLibrary;
 
       const result: ImagePickerResponse = await launch({
@@ -83,8 +116,9 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
   };
 
   const handleSave = async () => {
-    if (!firstName.trim()) {
-      setError('First name is required.');
+    const trimmedName = fullName.trim();
+    if (!trimmedName) {
+      setError('Full name is required.');
       return;
     }
 
@@ -97,9 +131,19 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
         await dispatch(uploadAvatar(avatarUri)).unwrap();
       }
 
+      const spaceIndex = trimmedName.indexOf(' ');
+      let parsedFirstName = '';
+      let parsedLastName = '';
+      if (spaceIndex === -1) {
+        parsedFirstName = trimmedName;
+      } else {
+        parsedFirstName = trimmedName.slice(0, spaceIndex).trim();
+        parsedLastName = trimmedName.slice(spaceIndex + 1).trim();
+      }
+
       await dispatch(updateProfile({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: parsedFirstName,
+        lastName: parsedLastName,
         email: email.trim() || undefined,
       })).unwrap();
 
@@ -113,7 +157,8 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
     }
   };
 
-  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U';
+  const nameParts = fullName.trim().split(/\s+/);
+  const initials = `${nameParts[0]?.[0] || ''}${nameParts[1]?.[0] || ''}`.toUpperCase() || 'U';
 
   return (
     <View style={styles.container}>
@@ -147,26 +192,14 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
           </View>
         </TouchableOpacity>
 
-        {/* First Name */}
-        <Text style={styles.inputLabel}>First Name</Text>
+        {/* Full Name */}
+        <Text style={styles.inputLabel}>Full Name</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="Enter first name"
+          placeholder="Enter full name"
           placeholderTextColor={Colors.termsMuted}
-          value={firstName}
-          onChangeText={setFirstName}
-          autoCapitalize="words"
-          selectionColor={Colors.primary}
-        />
-
-        {/* Last Name */}
-        <Text style={styles.inputLabel}>Last Name</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Enter last name"
-          placeholderTextColor={Colors.termsMuted}
-          value={lastName}
-          onChangeText={setLastName}
+          value={fullName}
+          onChangeText={setFullName}
           autoCapitalize="words"
           selectionColor={Colors.primary}
         />
@@ -194,9 +227,9 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
 
         {/* Save Button */}
         <TouchableOpacity
-          style={[styles.ctaButton, (!firstName.trim() || saving) && styles.ctaButtonDisabled]}
+          style={[styles.ctaButton, (!fullName.trim() || saving) && styles.ctaButtonDisabled]}
           onPress={handleSave}
-          disabled={!firstName.trim() || saving}
+          disabled={!fullName.trim() || saving}
           activeOpacity={0.85}
         >
           {saving ? (
@@ -216,39 +249,39 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundWhite,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing['3xl'],
+    paddingHorizontal: s(Spacing.xl),
+    paddingBottom: vs(Spacing['3xl']),
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.xl,
+    marginBottom: vs(Spacing.xl),
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: s(40),
+    height: s(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.black,
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(20),
+    color: '#1E293B',
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: Spacing['2xl'],
+    marginBottom: vs(Spacing['2xl']),
   },
   avatarWrapper: {
-    width: 110,
-    height: 110,
+    width: s(110),
+    height: s(110),
     position: 'relative',
   },
   avatarCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: s(110),
+    height: s(110),
+    borderRadius: s(55),
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -259,17 +292,17 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   avatarInitials: {
-    fontSize: 36,
-    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(36),
     color: Colors.white,
   },
   cameraButton: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    bottom: vs(2),
+    right: s(2),
+    width: s(36),
+    height: s(36),
+    borderRadius: s(18),
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -278,19 +311,23 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     ...Typography.label,
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14),
     color: Colors.textSecondaryFigma,
-    marginBottom: Spacing.sm,
+    marginBottom: vs(Spacing.sm),
   },
   textInput: {
     backgroundColor: Colors.backgroundInput,
-    borderRadius: BorderRadius.button,
+    borderRadius: s(BorderRadius.button),
     borderWidth: 1,
     borderColor: Colors.borderLight,
-    paddingHorizontal: Spacing.base,
-    height: 50,
+    paddingHorizontal: s(Spacing.base),
+    height: vs(50),
     ...Typography.bodyLarge,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(16),
     color: Colors.textOnLight,
-    marginBottom: Spacing.lg,
+    marginBottom: vs(Spacing.lg),
   },
   inputDisabled: {
     backgroundColor: Colors.background,
@@ -298,29 +335,34 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     ...Typography.bodyLarge,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(16),
     color: Colors.termsMuted,
   },
   errorText: {
     ...Typography.caption,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
     color: Colors.error,
     textAlign: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: vs(Spacing.md),
   },
   ctaButton: {
     width: '100%',
-    height: 54,
+    height: vs(54),
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.button,
+    borderRadius: s(BorderRadius.button),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.md,
+    marginTop: vs(Spacing.md),
   },
   ctaButtonDisabled: {
     opacity: 0.5,
   },
   ctaText: {
     ...Typography.button,
-    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(16),
     color: Colors.textOnPrimary,
   },
 });

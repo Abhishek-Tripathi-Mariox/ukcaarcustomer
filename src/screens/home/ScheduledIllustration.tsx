@@ -3,6 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Colors } from '@/theme';
 
+import { fs, s, vs } from '@/theme/responsive';
+
 /**
  * Replaces the live map on the Home Scheduled tab. Scheduled rides follow
  * fixed admin-defined routes, so a live map of nearby cabs is misleading.
@@ -14,10 +16,10 @@ export const ScheduledIllustration: React.FC = () => {
       <View style={styles.row}>
         <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
         <View style={styles.dashedLine} />
-        <View style={[styles.dot, { backgroundColor: Colors.dropoffRed }]} />
+        <View style={[styles.dot, { backgroundColor: Colors.error }]} />
       </View>
       <View style={styles.captionRow}>
-        <Ionicons name="information-circle-outline" size={14} color={Colors.textMuted} />
+        <Ionicons name="information-circle-outline" size={s(14)} color={Colors.textMuted} />
         <Text style={styles.caption}>
           Scheduled rides follow fixed routes — pick yours below.
         </Text>
@@ -32,17 +34,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.backgroundCard,
-    paddingHorizontal: 24,
+    paddingHorizontal: s(24),
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: vs(12),
   },
   dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: s(14),
+    height: s(14),
+    borderRadius: s(7),
   },
   dashedLine: {
     flex: 1,
@@ -50,16 +52,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 2,
     borderTopColor: Colors.border,
     borderStyle: 'dashed',
-    marginHorizontal: 8,
+    marginHorizontal: s(8),
   },
   captionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: s(6),
   },
   caption: {
     fontFamily: 'Inter-Regular',
-    fontSize: 12,
+    fontSize: fs(12),
     color: Colors.textMuted,
     textAlign: 'center',
   },

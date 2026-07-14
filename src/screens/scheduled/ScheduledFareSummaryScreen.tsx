@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
 import type { Passenger } from './ScheduledPassengerDetailsScreen';
 import type { RouteVehicle } from '@/services/routeService';
@@ -132,7 +133,7 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
 
         <View style={styles.card}>
           {/* Route name — Poppins-SemiBold 24 at 0.8 opacity */}
-          <Text style={styles.routeName} numberOfLines={1}>
+          <Text style={styles.routeName} numberOfLines={2}>
             {scheduledRoute.name}
           </Text>
 
@@ -146,9 +147,9 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
                   color={Colors.primary}
                 />
               </View>
-              <View style={{ marginLeft: 12 }}>
+              <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.stopLabel}>From</Text>
-                <Text style={styles.stopValue}>{boarding.name}</Text>
+                <Text style={styles.stopValue} numberOfLines={2}>{boarding.name}</Text>
               </View>
             </View>
             <View style={styles.stopConnector} />
@@ -156,9 +157,9 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
               <View style={styles.stopIconWrap}>
                 <Ionicons name="location-outline" size={18} color="#9CA3AF" />
               </View>
-              <View style={{ marginLeft: 12 }}>
+              <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={styles.stopLabel}>To</Text>
-                <Text style={styles.stopValue}>{dropping.name}</Text>
+                <Text style={styles.stopValue} numberOfLines={2}>{dropping.name}</Text>
               </View>
             </View>
           </View>
@@ -308,131 +309,112 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: Colors.backgroundCard },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: Colors.white,
-    flex: 1,
-    textAlign: 'center',
-  },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.white },
 
-  content: { padding: 16, paddingBottom: 140 },
-
+  content: { padding: s(16), paddingBottom: vs(120) },
   subtitle: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 22,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(14),
+    color: Colors.textSecondary,
+    marginBottom: vs(16),
+    paddingHorizontal: s(4),
   },
 
-  // Card — Figma node 73:1854. 24px radius, generous shadow, lots of
-  // internal vertical space.
   card: {
     backgroundColor: Colors.white,
-    borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingVertical: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderRadius: s(16),
+    paddingHorizontal: s(18),
+    paddingVertical: vs(20),
+    marginBottom: vs(16),
+    ...Shadow.sm,
   },
   routeName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 24,
-    lineHeight: 30,
-    color: '#000000',
-    opacity: 0.85,
-    marginBottom: 18,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(24),
+    color: Colors.textPrimary,
+    marginBottom: vs(16),
   },
 
-  // From/To with vertical connector — same shape as the route-card
-  // stop list on the Select Route screen.
-  stopBlock: {},
-  stopRow: { flexDirection: 'row', alignItems: 'center' },
-  stopIconWrap: {
-    width: 18,
-    height: 18,
+  stopBlock: {
+    marginLeft: s(4),
+  },
+  stopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  stopIconWrap: {
+    width: s(24),
+    alignItems: 'center',
   },
   stopConnector: {
-    width: 1.5,
-    height: 18,
-    backgroundColor: '#D1D5DB',
-    marginLeft: 8.25,
-    marginVertical: 6,
+    width: 2,
+    height: vs(16),
+    backgroundColor: Colors.borderLight,
+    marginLeft: s(11),
+    marginVertical: vs(4),
   },
   stopLabel: {
-    fontFamily: 'Poppins-Light',
-    fontSize: 10,
-    color: '#000000',
-    opacity: 0.8,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(10),
+    color: Colors.textSecondary,
   },
   stopValue: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#000000',
-    opacity: 0.85,
-    marginTop: 2,
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14),
+    color: Colors.textPrimary,
+    marginTop: vs(2),
+    flexShrink: 1,
   },
 
   divider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 18,
+    backgroundColor: Colors.borderLight,
+    marginVertical: vs(18),
   },
 
-  // Departure / Seats rows — small Poppins-Regular caption above a
-  // Poppins-SemiBold 16 value.
   detailRow: { flexDirection: 'row', alignItems: 'flex-start' },
   detailLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#333',
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textPrimary,
   },
   detailValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: '#000000',
-    opacity: 0.85,
-    marginTop: 2,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
+    marginTop: vs(2),
   },
 
   fareHeading: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: '#000000',
-    opacity: 0.85,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
   },
   fareRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 14,
+    marginTop: vs(14),
   },
   fareLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#333',
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textPrimary,
   },
   fareValue: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#333',
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textPrimary,
   },
 
   totalRow: {
@@ -441,127 +423,118 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   totalLabel: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: '#000000',
-    opacity: 0.85,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
   },
   totalValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: '#000000',
-    opacity: 0.85,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
   },
 
-  // Footer — white card with top-only shadow, full-width teal CTA.
   footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    backgroundColor: Colors.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(18),
+    backgroundColor: Colors.backgroundCard,
+    ...Shadow.top,
   },
   cta: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(8),
+    height: vs(56),
     alignItems: 'center',
     justifyContent: 'center',
   },
   ctaText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
-    lineHeight: 24,
-    letterSpacing: -0.3,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
     color: Colors.white,
   },
 
   returnCard: {
-    padding: 14,
-    backgroundColor: 'rgba(0,151,179,0.05)',
-    borderRadius: 12,
+    padding: s(14),
+    backgroundColor: alpha(Colors.primary, 0.05),
+    borderRadius: s(12),
     borderWidth: 1,
-    borderColor: 'rgba(0,151,179,0.2)',
+    borderColor: alpha(Colors.primary, 0.2),
   },
   returnHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: s(6),
+    marginBottom: vs(4),
   },
   returnTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(14),
     color: Colors.primary,
   },
   returnHelp: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#6A7282',
-    marginBottom: 10,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textSecondary,
+    marginBottom: vs(10),
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.white,
-    borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: s(24),
+    paddingHorizontal: s(14),
+    paddingVertical: vs(10),
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.borderLight,
   },
   toggleRowOn: {
     borderColor: Colors.primary,
   },
   toggleLabel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: '#111827',
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14),
+    color: Colors.textPrimary,
   },
   toggleLabelOn: { color: Colors.primary },
   toggleKnob: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
+    width: s(24),
+    height: s(24),
+    borderRadius: s(12),
+    backgroundColor: Colors.borderLight,
   },
   toggleKnobOn: { backgroundColor: Colors.primary },
-  returnPickerRow: { marginTop: 10 },
+  returnPickerRow: { marginTop: vs(10) },
   returnPickerLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: '#6A7282',
-    marginBottom: 6,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textSecondary,
+    marginBottom: vs(6),
   },
   returnTimes: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: s(8),
   },
   returnTimeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    paddingHorizontal: s(12),
+    paddingVertical: vs(8),
+    borderRadius: s(16),
     backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.borderLight,
   },
   returnTimeChipOn: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
   returnTimeText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 13,
-    color: '#111827',
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(13),
+    color: Colors.textPrimary,
   },
   returnTimeTextOn: { color: Colors.white },
 });

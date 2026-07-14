@@ -6,19 +6,20 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Image,
   Alert,
   ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RazorpayCheckout from 'react-native-razorpay';
-import { Colors, Shadow } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
 import type { Passenger } from './ScheduledPassengerDetailsScreen';
 import { routeService, type RouteVehicle } from '@/services/routeService';
 import { paymentService } from '@/services/paymentService';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { setWalletBalance as setGlobalWalletBalance } from '@/store/slices/appSlice';
 
 interface Stop { id: string; name: string; time: string }
 
@@ -41,24 +42,9 @@ interface Props {
   };
 }
 
-const gpay = require('../../../assets/payment-option/gpay.png');
-const paytm = require('../../../assets/payment-option/paytm.png');
-const mastercard = require('../../../assets/payment-option/mastercard.png');
-const phonepe = require('../../../assets/payment-option/phonepe.png');
-const mobikwik = require('../../../assets/payment-option/mobikwik.png');
-const cred = require('../../../assets/payment-option/cred.png');
-
-interface PaymentOption {
-  id: string;
-  label: string;
-  icon: any;
-  amount: number;
-  meta?: string;
-  secured?: boolean;
-}
-
 export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const dispatch = useAppDispatch();
   const {
     route: scheduledRoute,
     boarding,
@@ -72,47 +58,88 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
     vehicle,
     returnDeparture,
   } = route.params;
-  const [selected, setSelected] = useState<string>('gpay');
+
+  const [paymentMode, setPaymentMode] = useState<'razorpay' | 'wallet'>('razorpay');
   const [paying, setPaying] = useState(false);
   const user = useAppSelector((s) => s.auth.user);
+  const walletBalance = useAppSelector((s) => s.app.walletBalance);
 
-  const preferredOptions: PaymentOption[] = [
-    { id: 'gpay', label: 'Google Pay', icon: gpay, amount: total },
-    { id: 'paytm', label: 'Paytm', icon: paytm, amount: 145 },
-    { id: 'mastercard', label: '· · · ·  9999', icon: mastercard, amount: 145, secured: true },
-  ];
-
-  const upiOptions: PaymentOption[] = [
-    { id: 'phonepe', label: 'PhonePe UPI', icon: phonepe, amount: 0, meta: 'Low success rate currently' },
-    { id: 'mobikwik', label: 'Mobikwik', icon: mobikwik, amount: 0 },
-    { id: 'cred', label: 'CRED pay', icon: cred, amount: 0 },
-  ];
-
-  // Razorpay checkout for the scheduled seat reservation. Mirrors the
-  // instant ride-payment flow exactly (see RideCompleteScreen.payWithRazorpay):
-  //   1. createOrder({ type:'scheduled_booking', amount, scheduledRouteId })
-  //   2. RazorpayCheckout.open(...)
-  //   3. verifyPayment({ order_id, payment_id, signature })
-  //   4. Only after the payment is verified, atomically reserve the seats
-  //      via routeService.bookSeats. If seats are 409'd at that point,
-  //      surface the conflict so the rider can pick again — the rider's
-  //      payment is already on record under their Payment row and can be
-  //      refunded out-of-band by admin (rare race, sub-second window).
   const handlePay = async () => {
     if (paying) return;
     setPaying(true);
+
     try {
-      const orderRes = await paymentService.createOrder({
-        amount: total,
-        type: 'scheduled_booking',
-        // Tag the order with the route so admins can reconcile in the
-        // Razorpay dashboard if anything ever lands without a booking.
-        scheduledRouteId: scheduledRoute.id,
-      });
-      if (!orderRes.success) {
-        Alert.alert('Error', 'Failed to create payment order');
+      // ── 1. Pay via UKCAAR Wallet Balance ──
+      if (paymentMode === 'wallet') {
+        if (walletBalance < total) {
+          Alert.alert(
+            'Insufficient Wallet Balance',
+            `Your wallet balance is ₹${walletBalance}. Please select Razorpay Online Payment to proceed.`,
+            [{ text: 'Switch to Razorpay', onPress: () => setPaymentMode('razorpay') }],
+          );
+          setPaying(false);
+          return;
+        }
+
+        try {
+          const booked = await routeService.bookSeats(scheduledRoute.id, {
+            departureDate,
+            departureIndex,
+            driverId,
+            seats,
+            totalAmount: total,
+            passengers,
+          });
+          const bookingId = booked?.booking?._id ?? booked?.booking?.id;
+          dispatch(setGlobalWalletBalance(Math.max(0, walletBalance - total)));
+
+          navigation.replace('ScheduledBookingDetails', {
+            route: scheduledRoute,
+            boarding,
+            dropping,
+            seats,
+            passengers,
+            total,
+            departureDate,
+            departureIndex,
+            driverId,
+            vehicle,
+            bookingId,
+            returnDeparture,
+          });
+        } catch (bookErr: any) {
+          const bs = bookErr?.response?.status;
+          const bd = bookErr?.response?.data;
+          if (bs === 409) {
+            const conflicts: number[] = bd?.data?.conflicts ?? [];
+            Alert.alert(
+              'Seats Unavailable',
+              conflicts.length
+                ? `Seat(s) ${conflicts.join(', ')} were reserved by another rider.`
+                : 'Some of your selected seats were just taken. Please pick another seat.',
+              [{ text: 'Pick again', onPress: () => navigation.goBack() }],
+            );
+          } else {
+            Alert.alert(
+              'Booking Failed',
+              bd?.message || bookErr?.message || 'Could not complete wallet reservation.',
+            );
+          }
+        }
         return;
       }
+
+      // ── 2. Pay via Razorpay Gateway (UPI, Cards, Google Pay, PhonePe, NetBanking) ──
+      const orderRes = await paymentService.createOrder({
+        amount: total,
+        type: 'ride_payment',
+      });
+
+      if (!orderRes.success) {
+        Alert.alert('Error', 'Failed to initialize payment order with Razorpay.');
+        return;
+      }
+
       const { orderId, keyId, currency } = orderRes.data;
 
       const options = {
@@ -140,11 +167,11 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
       });
 
       if (!verifyRes.success) {
-        Alert.alert('Payment failed', 'Could not verify the payment.');
+        Alert.alert('Payment Verification Failed', 'Could not verify your online payment.');
         return;
       }
 
-      // Payment captured & verified — atomically reserve seats now.
+      // Atomically reserve seats after verified payment
       try {
         const booked = await routeService.bookSeats(scheduledRoute.id, {
           departureDate,
@@ -155,9 +182,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
           passengers,
         });
         const bookingId = booked?.booking?._id ?? booked?.booking?.id;
-        // Move straight to the Booking Confirmed screen — same pattern as the
-        // instant ride flow (RideComplete → PaymentSuccess). No success modal
-        // to dismiss, so the flow can't dead-end on the payment screen.
+
         navigation.replace('ScheduledBookingDetails', {
           route: scheduledRoute,
           boarding,
@@ -178,30 +203,24 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
         if (bs === 409) {
           const conflicts: number[] = bd?.data?.conflicts ?? [];
           Alert.alert(
-            'Seats just got taken',
+            'Seats Unavailable',
             conflicts.length
-              ? `Seat${conflicts.length > 1 ? 's' : ''} ${conflicts.join(', ')} ${
-                  conflicts.length > 1 ? 'were' : 'was'
-                } reserved by another rider in the last moment. Your payment is on file — contact support for a refund or pick different seats.`
-              : 'Some of your seats were just reserved by another rider. Contact support to refund or pick again.',
+              ? `Seat(s) ${conflicts.join(', ')} were reserved by another rider.`
+              : 'Some of your selected seats were just taken. Your payment has been received and support will assist with a refund or alternate seat.',
             [{ text: 'Pick again', onPress: () => navigation.goBack() }],
           );
         } else {
           Alert.alert(
-            'Booking failed',
-            bd?.message ||
-              bookErr?.message ||
-              'Payment went through but we couldn\'t reserve the seats. Please contact support.',
+            'Booking Error',
+            bd?.message || bookErr?.message || 'Payment succeeded but seat reservation encountered an issue. Support team has been notified.',
           );
         }
       }
     } catch (err: any) {
-      // Razorpay returns code 2 when the user dismisses the sheet —
-      // suppress the error toast for that path (same as instant flow).
-      if (err?.code !== 2) {
+      if (err?.code !== 2 && err?.code !== '2') {
         Alert.alert(
-          'Payment failed',
-          err?.description || err?.message || 'Something went wrong',
+          'Payment Cancelled',
+          err?.description || err?.message || 'Payment flow was stopped.',
         );
       }
     } finally {
@@ -209,88 +228,163 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
     }
   };
 
-  const renderOption = (opt: PaymentOption) => {
-    const isSelected = opt.id === selected;
-    return (
-      <TouchableOpacity
-        key={opt.id}
-        activeOpacity={0.85}
-        onPress={() => setSelected(opt.id)}
-        style={styles.optionRow}
-      >
-        <View style={styles.optionLeft}>
-          <Image source={opt.icon} style={styles.optionIcon} resizeMode="contain" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionLabel}>{opt.label}</Text>
-            {opt.meta && <Text style={styles.optionMeta}>{opt.meta}</Text>}
-          </View>
-        </View>
-        {opt.amount > 0 && (
-          <Text style={styles.optionAmount}>{'\u20B9'}{opt.amount}</Text>
-        )}
-        {opt.secured && (
-          <View style={styles.securedBadge}>
-            <Ionicons name="shield-checkmark" size={10} color={Colors.primary} />
-            <Text style={styles.securedText}>Secured</Text>
-          </View>
-        )}
-        <View style={[styles.radio, isSelected && styles.radioActive]}>
-          {isSelected && <Ionicons name="checkmark" size={12} color={Colors.white} />}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const bottomPadding = Math.max(insets.bottom, 14);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      <View style={styles.header}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + vs(10) }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.white} />
+          <Ionicons name="chevron-back" size={s(24)} color={Colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Fare Summary</Text>
-        <View style={{ width: 32 }} />
+        <Text style={styles.headerTitle}>Review & Pay</Text>
+        <View style={{ width: s(32) }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionHead}>Preferred Mode</Text>
-        <View style={styles.card}>
-          {preferredOptions.map((o, i) => (
-            <View key={o.id}>
-              {renderOption(o)}
-              {o.id === 'gpay' && selected === 'gpay' && (
-                <TouchableOpacity style={styles.payViaBtn} onPress={handlePay} activeOpacity={0.85}>
-                  <Text style={styles.payViaText}>Pay using Google Pay</Text>
-                </TouchableOpacity>
-              )}
-              {i < preferredOptions.length - 1 && <View style={styles.optionDivider} />}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Trip Summary Card */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTop}>
+            <View style={styles.badge}>
+              <Ionicons name="bus-outline" size={s(16)} color={Colors.primary} />
+              <Text style={styles.badgeText}>SCHEDULED SHUTTLE</Text>
             </View>
-          ))}
+            <Text style={styles.routeDate}>{departureDate}</Text>
+          </View>
+
+          <Text style={styles.routeName} numberOfLines={2}>{scheduledRoute.name}</Text>
+
+          {/* Boarding / Dropping */}
+          <View style={styles.stopTimeline}>
+            <View style={styles.stopRow}>
+              <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+              <View style={styles.stopTextCol}>
+                <Text style={styles.stopLabel}>Boarding Point</Text>
+                <Text style={styles.stopName} numberOfLines={2}>{boarding.name} ({boarding.time})</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineLine} />
+
+            <View style={styles.stopRow}>
+              <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
+              <View style={styles.stopTextCol}>
+                <Text style={styles.stopLabel}>Dropping Point</Text>
+                <Text style={styles.stopName} numberOfLines={2}>{dropping.name} ({dropping.time})</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Seat details */}
+          <View style={styles.seatRow}>
+            <Text style={styles.seatLabel}>
+              Selected Seat{seats.length > 1 ? 's' : ''}:{' '}
+              <Text style={styles.seatNumbers}>{seats.join(', ')}</Text>
+            </Text>
+            <Text style={styles.seatCount}>{seats.length} Passenger{seats.length > 1 ? 's' : ''}</Text>
+          </View>
         </View>
 
-        <Text style={styles.sectionHead}>UPI</Text>
-        <View style={styles.card}>
-          {upiOptions.map((o, i) => (
-            <View key={o.id}>
-              {renderOption(o)}
-              {i < upiOptions.length - 1 && <View style={styles.optionDivider} />}
+        {/* Payment Options Section */}
+        <Text style={styles.sectionHead}>Select Payment Method</Text>
+
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[
+            styles.paymentCard,
+            paymentMode === 'razorpay' && styles.paymentCardActive,
+          ]}
+          onPress={() => setPaymentMode('razorpay')}
+        >
+          <View style={styles.paymentCardLeft}>
+            <View style={styles.iconBox}>
+              <Ionicons name="shield-checkmark" size={s(22)} color={Colors.primary} />
             </View>
-          ))}
+            <View style={{ flex: 1 }}>
+              <View style={styles.titleRow}>
+                <Text style={styles.paymentTitle}>Razorpay Online Gateway</Text>
+                <View style={styles.secBadge}>
+                  <Text style={styles.secBadgeText}>INSTANT</Text>
+                </View>
+              </View>
+              <Text style={styles.paymentSub}>
+                UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, NetBanking
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.radio, paymentMode === 'razorpay' && styles.radioActive]}>
+            {paymentMode === 'razorpay' && (
+              <Ionicons name="checkmark" size={s(13)} color={Colors.white} />
+            )}
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[
+            styles.paymentCard,
+            paymentMode === 'wallet' && styles.paymentCardActive,
+          ]}
+          onPress={() => setPaymentMode('wallet')}
+        >
+          <View style={styles.paymentCardLeft}>
+            <View style={[styles.iconBox, { backgroundColor: alpha('#10B981', 0.12) }]}>
+              <Ionicons name="wallet-outline" size={s(22)} color="#10B981" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.paymentTitle}>UKCAAR Wallet</Text>
+              <Text style={styles.paymentSub}>
+                Available Balance: {'\u20B9'}{walletBalance}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.radio, paymentMode === 'wallet' && styles.radioActive]}>
+            {paymentMode === 'wallet' && (
+              <Ionicons name="checkmark" size={s(13)} color={Colors.white} />
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {/* Fare Summary Box */}
+        <View style={styles.fareBox}>
+          <Text style={styles.fareTitle}>Payment Breakdown</Text>
+          <View style={styles.fareRow}>
+            <Text style={styles.fareText}>Fare ({seats.length} seat{seats.length > 1 ? 's' : ''})</Text>
+            <Text style={styles.fareAmount}>{'\u20B9'}{total}</Text>
+          </View>
+          <View style={styles.fareRow}>
+            <Text style={styles.fareText}>Taxes & Fees</Text>
+            <Text style={[styles.fareAmount, { color: '#10B981' }]}>Included</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.fareRow}>
+            <Text style={styles.totalText}>Total Payable</Text>
+            <Text style={styles.totalAmount}>{'\u20B9'}{total}</Text>
+          </View>
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      {/* Footer CTA */}
+      <View style={[styles.footer, { paddingBottom: bottomPadding }]}>
         <TouchableOpacity
           style={[styles.cta, paying && { opacity: 0.6 }]}
           onPress={handlePay}
-          activeOpacity={0.85}
+          activeOpacity={0.88}
           disabled={paying}
         >
           {paying ? (
             <ActivityIndicator color={Colors.white} />
           ) : (
-            <Text style={styles.ctaText}>Confirm & Pay</Text>
+            <View style={styles.ctaRow}>
+              <Text style={styles.ctaText}>
+                {paymentMode === 'razorpay'
+                  ? `Pay \u20B9${total} via Razorpay`
+                  : `Pay \u20B9${total} from Wallet`}
+              </Text>
+              <Ionicons name="arrow-forward" size={s(18)} color={Colors.white} />
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -305,155 +399,196 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingBottom: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: 18, color: Colors.white, flex: 1, textAlign: 'center' },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.white, flex: 1, textAlign: 'center' },
 
-  content: { padding: 16, paddingBottom: 120 },
-  sectionHead: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    color: Colors.textPrimary,
-    marginBottom: 10,
-    marginTop: 6,
-  },
-  card: {
+  content: { padding: s(16), paddingBottom: vs(140) },
+
+  summaryCard: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    marginBottom: 18,
+    borderRadius: s(16),
+    padding: s(16),
+    marginBottom: vs(18),
     ...Shadow.sm,
     borderWidth: 1,
     borderColor: Colors.borderLight,
   },
-  optionRow: {
+  summaryTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: vs(8),
   },
-  optionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  optionIcon: { width: 32, height: 32 },
-  optionLabel: { fontFamily: 'Inter-SemiBold', fontSize: 15, color: Colors.textPrimary },
-  optionMeta: { fontFamily: 'Inter-Regular', fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  optionAmount: { fontFamily: 'Inter-SemiBold', fontSize: 14, color: Colors.textPrimary },
-  securedBadge: {
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(0, 151, 179, 0.12)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
+    gap: s(5),
+    backgroundColor: alpha(Colors.primary, 0.12),
+    paddingHorizontal: s(8),
+    paddingVertical: vs(4),
+    borderRadius: s(6),
   },
-  securedText: { fontFamily: 'Inter-Medium', fontSize: 10, color: Colors.primary },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  badgeText: { fontFamily: 'Inter-Bold', fontSize: fs(11), color: Colors.primary },
+  routeDate: { fontFamily: 'Inter-Medium', fontSize: fs(13), color: Colors.textMuted },
+  routeName: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(18),
+    color: Colors.textPrimary,
+    marginBottom: vs(14),
+  },
+
+  stopTimeline: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: s(12),
+    padding: s(12),
+    marginBottom: vs(12),
+  },
+  stopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: s(10),
+  },
+  dot: {
+    width: s(10),
+    height: s(10),
+    borderRadius: s(5),
+    marginTop: vs(4),
+  },
+  timelineLine: {
+    width: 2,
+    height: vs(14),
+    backgroundColor: Colors.border,
+    marginLeft: s(4),
+    marginVertical: vs(2),
+  },
+  stopTextCol: { flex: 1 },
+  stopLabel: { fontFamily: 'Inter-Regular', fontSize: fs(11), color: Colors.textMuted },
+  stopName: { fontFamily: 'Inter-SemiBold', fontSize: fs(14), color: Colors.textPrimary, flexShrink: 1 },
+
+  seatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingTop: vs(12),
+  },
+  seatLabel: { fontFamily: 'Inter-Medium', fontSize: fs(13), color: Colors.textMuted },
+  seatNumbers: { fontFamily: 'Inter-Bold', color: Colors.textPrimary },
+  seatCount: { fontFamily: 'Inter-SemiBold', fontSize: fs(13), color: Colors.primary },
+
+  sectionHead: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
+    marginBottom: vs(12),
+  },
+
+  paymentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.white,
+    borderRadius: s(14),
+    padding: s(14),
+    marginBottom: vs(12),
     borderWidth: 1.5,
+    borderColor: Colors.borderLight,
+    ...Shadow.sm,
+  },
+  paymentCardActive: {
+    borderColor: Colors.primary,
+    backgroundColor: alpha(Colors.primary, 0.03),
+  },
+  paymentCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(12),
+    flex: 1,
+  },
+  iconBox: {
+    width: s(42),
+    height: s(42),
+    borderRadius: s(12),
+    backgroundColor: alpha(Colors.primary, 0.12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: s(8) },
+  paymentTitle: { fontFamily: 'Inter-Bold', fontSize: fs(15), color: Colors.textPrimary },
+  secBadge: {
+    backgroundColor: alpha(Colors.primary, 0.15),
+    paddingHorizontal: s(6),
+    paddingVertical: vs(2),
+    borderRadius: s(4),
+  },
+  secBadgeText: { fontFamily: 'Inter-Bold', fontSize: fs(9), color: Colors.primary },
+  paymentSub: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: Colors.textMuted, marginTop: vs(2) },
+
+  radio: {
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
+    borderWidth: 2,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: s(10),
   },
-  radioActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  optionDivider: { height: 1, backgroundColor: Colors.borderLight },
-
-  payViaBtn: {
+  radioActive: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-    marginHorizontal: 32,
+    borderColor: Colors.primary,
   },
-  payViaText: { fontFamily: 'Inter-SemiBold', fontSize: 14, color: Colors.white },
+
+  fareBox: {
+    backgroundColor: Colors.white,
+    borderRadius: s(14),
+    padding: s(16),
+    marginTop: vs(8),
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  fareTitle: { fontFamily: 'Inter-Bold', fontSize: fs(15), color: Colors.textPrimary, marginBottom: vs(10) },
+  fareRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: vs(8),
+  },
+  fareText: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: Colors.textMuted },
+  fareAmount: { fontFamily: 'Inter-SemiBold', fontSize: fs(13), color: Colors.textPrimary },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+    marginVertical: vs(8),
+  },
+  totalText: { fontFamily: 'Inter-Bold', fontSize: fs(15), color: Colors.textPrimary },
+  totalAmount: { fontFamily: 'Inter-Bold', fontSize: fs(16), color: Colors.primary },
 
   footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 16,
+    paddingHorizontal: s(16),
+    paddingTop: vs(12),
     backgroundColor: Colors.backgroundCard,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
   cta: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(12),
+    height: vs(54),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { fontFamily: 'Inter-SemiBold', fontSize: 16, color: Colors.white },
-
-  /* ── Success Modal ── */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  ctaRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    gap: s(8),
   },
-  successCard: {
-    width: '100%',
-    backgroundColor: Colors.white,
-    borderRadius: 18,
-    padding: 28,
-    alignItems: 'center',
-  },
-  closeBtn: { position: 'absolute', top: 14, right: 14, padding: 4 },
-  successIconOuter: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(0, 151, 179, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  successIconInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  successTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 20,
-    color: Colors.primary,
-    marginTop: 18,
-  },
-  successAmount: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 24,
-    color: Colors.textPrimary,
-    marginTop: 8,
-  },
-  successDate: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: Colors.textPrimary,
-    marginTop: 12,
-  },
-  successTax: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 4,
-  },
-  viewTicketBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 50,
-    marginTop: 18,
-  },
-  viewTicketText: { fontFamily: 'Inter-SemiBold', fontSize: 15, color: Colors.white },
+  ctaText: { fontFamily: 'Inter-Bold', fontSize: fs(16), color: Colors.white },
 });

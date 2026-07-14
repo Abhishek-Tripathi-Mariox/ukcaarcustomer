@@ -14,6 +14,8 @@ import {
   DecorativeDotIcon,
   SparkleIcon,
 } from '@/components/icons/PaymentSuccessIcons';
+import { Colors, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 
 interface PaymentSuccessModalProps {
   visible: boolean;
@@ -67,28 +69,28 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
       <Pressable style={styles.backdrop} onPress={onClose} disabled={!onClose}>
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
           {/* Decorative scattered markers */}
-          <View style={[styles.marker, { top: 12, left: 30 }]}>
-            <DecorativeCrossIcon size={19} />
+          <View style={[styles.marker, { top: vs(12), left: s(30) }]}>
+            <DecorativeCrossIcon size={s(19)} />
           </View>
-          <View style={[styles.marker, { top: 160, right: 30 }]}>
-            <DecorativeCrossIcon size={19} />
+          <View style={[styles.marker, { top: vs(160), right: s(30) }]}>
+            <DecorativeCrossIcon size={s(19)} />
           </View>
-          <View style={[styles.marker, { top: 80, left: 18 }]}>
-            <DecorativeDotIcon size={8} />
+          <View style={[styles.marker, { top: vs(80), left: s(18) }]}>
+            <DecorativeDotIcon size={s(8)} />
           </View>
-          <View style={[styles.marker, { top: 30, right: 36 }]}>
-            <DecorativeDotIcon size={8} />
+          <View style={[styles.marker, { top: vs(30), right: s(36) }]}>
+            <DecorativeDotIcon size={s(8)} />
           </View>
-          <View style={[styles.marker, { top: 170, left: 45 }]}>
-            <SparkleIcon size={12} />
+          <View style={[styles.marker, { top: vs(170), left: s(45) }]}>
+            <SparkleIcon size={s(12)} />
           </View>
-          <View style={[styles.marker, { top: 90, right: 18 }]}>
-            <SparkleIcon size={12} />
+          <View style={[styles.marker, { top: vs(90), right: s(18) }]}>
+            <SparkleIcon size={s(12)} />
           </View>
 
           {/* Success animation */}
           <View style={styles.animationWrap}>
-            <SuccessAnimationIcon size={132} />
+            <SuccessAnimationIcon size={s(132)} />
           </View>
 
           {/* Heading */}
@@ -128,22 +130,22 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
   );
 };
 
-const CARD_WIDTH = Math.min(370, SCREEN_WIDTH - 32);
+const CARD_WIDTH = Math.min(s(370), SCREEN_WIDTH - s(32));
 
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(65,65,65,0.5)',
+    backgroundColor: alpha('#414141', 0.5),
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: s(16),
   },
   card: {
     width: CARD_WIDTH,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingTop: 28,
-    paddingBottom: 32,
+    backgroundColor: Colors.white,
+    borderRadius: s(20),
+    paddingTop: vs(28),
+    paddingBottom: vs(32),
     alignItems: 'center',
     overflow: 'hidden',
   },
@@ -151,62 +153,62 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   animationWrap: {
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: vs(8),
+    marginBottom: vs(24),
   },
   title: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 24,
-    color: '#0097B3',
+    fontSize: fs(24),
+    color: Colors.primary,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: vs(12),
   },
   amount: {
     fontFamily: 'Inter-Bold',
-    fontSize: 22,
-    color: '#262626',
+    fontSize: fs(22),
+    color: Colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: vs(16),
   },
   rupee: {
     fontFamily: 'Inter-Bold',
-    fontSize: 22,
+    fontSize: fs(22),
   },
   dateText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#000000',
+    fontSize: fs(16),
+    color: Colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: vs(4),
   },
   taxId: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#666666',
+    fontSize: fs(14),
+    color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 22,
+    marginBottom: vs(22),
   },
   rateButton: {
-    width: 235,
-    height: 46,
-    backgroundColor: '#0097B3',
-    borderRadius: 8,
+    width: s(235),
+    height: vs(46),
+    backgroundColor: Colors.primary,
+    borderRadius: s(8),
     alignItems: 'center',
     justifyContent: 'center',
   },
   rateButtonText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: fs(14),
+    color: Colors.white,
   },
   closeButton: {
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    marginTop: vs(12),
+    paddingVertical: vs(8),
+    paddingHorizontal: s(16),
   },
   closeButtonText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#666666',
+    fontSize: fs(14),
+    color: Colors.textSecondary,
   },
 });

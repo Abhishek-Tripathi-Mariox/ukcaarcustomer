@@ -327,27 +327,27 @@ const styles = StyleSheet.create({
     marginBottom: vs(Spacing['3xl']),
   },
   backText: {
+    fontFamily: 'Inter-Medium',
     fontSize: fs(17),
-    fontWeight: '500',
-    color: Colors.textOnLight,
-    marginLeft: 4,
+    color: Colors.textPrimary,
+    marginLeft: s(4),
   },
   topSection: {
     // No flex: 1 — let ScrollView handle sizing so the Verify button rides up
     // naturally when the keyboard opens.
   },
   title: {
+    fontFamily: 'Inter-Bold',
     fontSize: fs(30),
-    fontWeight: '800',
     lineHeight: fs(40),
-    color: Colors.black,
+    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: vs(Spacing.md),
   },
   subtitle: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(16),
-    fontWeight: '400',
-    color: '#7D8A95',
+    color: Colors.textPrimary,
     lineHeight: fs(24),
     textAlign: 'center',
     letterSpacing: 0,
@@ -367,9 +367,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.borderLight,
     textAlign: 'center',
+    fontFamily: 'Inter-Bold',
     fontSize: fs(22),
-    fontWeight: '700',
-    color: Colors.textOnLight,
+    color: Colors.textPrimary,
     padding: 0,
   },
   otpInputFilled: {
@@ -381,22 +381,22 @@ const styles = StyleSheet.create({
     marginBottom: vs(Spacing.lg),
   },
   timerText: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(16),
-    fontWeight: '400',
-    color: Colors.textSecondaryFigma,
+    color: Colors.textSecondary,
   },
   timerCount: {
+    fontFamily: 'Inter-SemiBold',
     color: Colors.primary,
-    fontWeight: '600',
   },
   resendLabel: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(16),
-    fontWeight: '400',
-    color: Colors.textSecondaryFigma,
+    color: Colors.textSecondary,
   },
   resendActive: {
+    fontFamily: 'Inter-SemiBold',
     fontSize: fs(16),
-    fontWeight: '600',
     color: Colors.error,
   },
   bottomSection: {
@@ -417,14 +417,14 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   ctaText: {
+    fontFamily: 'Inter-Medium',
     fontSize: fs(18),
-    fontWeight: '600',
     lineHeight: fs(24),
     color: Colors.textOnPrimary,
   },
   terms: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(14),
-    fontWeight: '400',
     color: Colors.termsMuted,
     textAlign: 'center',
     lineHeight: fs(22),
@@ -433,8 +433,8 @@ const styles = StyleSheet.create({
     color: Colors.link,
   },
   errorText: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(16),
-    fontWeight: '400',
     color: Colors.error,
     textAlign: 'center',
     marginBottom: vs(Spacing.md),

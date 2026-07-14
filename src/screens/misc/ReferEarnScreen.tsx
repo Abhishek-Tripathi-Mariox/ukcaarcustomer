@@ -259,7 +259,7 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0097B3" />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       {/* Teal header */}
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <TouchableOpacity

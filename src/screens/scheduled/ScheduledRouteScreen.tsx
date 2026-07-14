@@ -12,6 +12,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { TargetIcon } from '@/components/icons/HomeIcons';
 import { routeService, type ScheduledRouteApi } from '@/services/routeService';
 import { geoService } from '@/services/geoService';
@@ -145,7 +146,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
   const [routes, setRoutes] = useState<ScheduledRoute[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pickup] = useState(route?.params?.pickup || 'khora, Noida 62');
+  const [pickup] = useState(route?.params?.pickup || '');
   const [dropoff] = useState(route?.params?.drop || '');
 
   useEffect(() => {
@@ -169,7 +170,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
       if (cancelled) return;
       routeService
         .listScheduled({
-          hasApprovedDriver: true,
+          hasApprovedDriver: false,
           pickup: pickupCoords,
           drop: dropCoords,
         })
@@ -288,7 +289,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
                     color={Colors.primary}
                   />
                 </View>
-                <Text style={styles.stopText} numberOfLines={1}>
+                <Text style={styles.stopText} numberOfLines={2}>
                   {r.from}
                 </Text>
               </View>
@@ -301,7 +302,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
                     color="#9CA3AF"
                   />
                 </View>
-                <Text style={styles.stopText} numberOfLines={1}>
+                <Text style={styles.stopText} numberOfLines={2}>
                   {r.to}
                 </Text>
               </View>
@@ -362,152 +363,145 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
+    fontSize: fs(18),
     color: Colors.white,
   },
-  content: { padding: 16, paddingBottom: 120 },
+  content: { padding: s(16), paddingBottom: vs(120) },
 
-  inputWrapper: { marginBottom: 14, position: 'relative', paddingTop: 8 },
+  inputWrapper: { marginBottom: vs(14), position: 'relative', paddingTop: vs(8) },
   inputFloatLabel: {
     position: 'absolute',
     top: 0,
-    left: 20,
+    left: s(20),
     zIndex: 2,
     backgroundColor: Colors.white,
-    paddingHorizontal: 8,
+    paddingHorizontal: s(8),
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textSecondary,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    borderRadius: 14,
+    borderRadius: s(14),
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 14,
-    height: 60,
-    gap: 10,
+    paddingHorizontal: s(14),
+    height: vs(60),
+    gap: s(10),
     ...Shadow.sm,
   },
   inputContainerActive: { borderColor: Colors.primary },
   inputIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: s(40),
+    height: s(40),
+    borderRadius: s(20),
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  inputIconImage: { width: 40, height: 40 },
+  inputIconImage: { width: s(40), height: s(40) },
   inputValue: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textSecondary,
     flex: 1,
   },
   inputPlaceholder: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textMuted,
     flex: 1,
   },
-  gpsButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  gpsButton: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
 
-  // Route card — matches Figma node 67:5970 (24px radius, generous
-  // shadow, 2px teal border when selected).
   routeCard: {
     backgroundColor: Colors.white,
-    borderRadius: 24,
+    borderRadius: s(24),
     borderWidth: 2,
     borderColor: 'transparent',
-    paddingVertical: 22,
-    paddingHorizontal: 23,
-    marginTop: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingVertical: vs(22),
+    paddingHorizontal: s(23),
+    marginTop: vs(14),
+    ...Shadow.md,
   },
   routeCardActive: { borderColor: Colors.primary },
   routeName: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: fs(24),
+    lineHeight: fs(30),
     color: Colors.textPrimary,
     opacity: 0.85,
-    marginBottom: 18,
+    marginBottom: vs(18),
   },
 
-  stopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stopRow: { flexDirection: 'row', alignItems: 'center', gap: s(12) },
   stopIconWrap: {
-    width: 18,
-    height: 18,
+    width: s(18),
+    height: s(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
   stopText: {
     fontFamily: 'Poppins-Light',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: fs(14),
+    lineHeight: fs(20),
     color: Colors.textPrimary,
     opacity: 0.85,
     flex: 1,
+    flexShrink: 1,
   },
   stopConnector: {
     width: 1.5,
-    height: 18,
-    backgroundColor: '#D1D5DB',
-    marginLeft: 8.25, // (18 / 2) - 0.75, centred under the icon
-    marginVertical: 4,
+    height: vs(18),
+    backgroundColor: Colors.borderLight,
+    marginLeft: s(8.25),
+    marginVertical: vs(4),
   },
 
-  // Metrics row — label+icon stack on top, big value below. Matches
-  // Figma's three equal-width columns.
   metricsRow: {
     flexDirection: 'row',
-    marginTop: 20,
+    marginTop: vs(20),
   },
   metricCell: { flex: 1 },
   metricHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: s(4),
     opacity: 0.3,
-    marginBottom: 4,
+    marginBottom: vs(4),
   },
   metricLabel: {
     fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    lineHeight: 16,
-    color: '#000000',
+    fontSize: fs(12),
+    lineHeight: fs(16),
+    color: Colors.textPrimary,
   },
   metricValue: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: fs(16),
+    lineHeight: fs(22),
     color: Colors.textPrimary,
     opacity: 0.85,
   },
 
   cardDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
-    marginTop: 16,
-    marginBottom: 12,
+    backgroundColor: Colors.borderLight,
+    marginTop: vs(16),
+    marginBottom: vs(12),
   },
   nextDeparture: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: fs(15),
+    lineHeight: fs(22),
     color: Colors.textPrimary,
     opacity: 0.85,
   },
@@ -517,21 +511,21 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 16,
+    padding: s(16),
     backgroundColor: Colors.backgroundCard,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
   cta: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(8),
+    height: vs(56),
     alignItems: 'center',
     justifyContent: 'center',
   },
   ctaText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: Colors.white,
   },
 });

@@ -221,7 +221,7 @@ export default function App() {
     <Provider store={store}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <StatusBar barStyle="dark-content" />
+          <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
           <FcmBridge />
           <SocketBridge />
           <ResumeRideBridge />

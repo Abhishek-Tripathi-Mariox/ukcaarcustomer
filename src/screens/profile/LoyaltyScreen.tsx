@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { Typography, Colors, Spacing, BorderRadius } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, BorderRadius } from '@/theme';
 import { KeyboardAwareScrollView } from '@/components/common';
 import {
   loyaltyService,
@@ -228,64 +229,64 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
+    paddingHorizontal: s(Spacing.base), paddingVertical: vs(Spacing.md),
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  content: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing['3xl'] },
+  backBtn: { width: s(36), height: s(36), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-Bold', fontSize: fs(20), color: '#1E293B' },
+  content: { paddingHorizontal: s(Spacing.xl), paddingBottom: vs(Spacing['3xl']) },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   pointsCard: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.lg,
-    padding: Spacing.lg, marginTop: Spacing.md,
+    backgroundColor: Colors.primary, borderRadius: s(BorderRadius.lg),
+    padding: s(Spacing.lg), marginTop: vs(Spacing.md),
   },
   pointsTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  pointsLabel: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
-  pointsValue: { fontSize: 34, fontWeight: '800', color: '#fff', marginTop: 2 },
+  pointsLabel: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: 'rgba(255,255,255,0.85)' },
+  pointsValue: { fontFamily: 'Inter-ExtraBold', fontSize: fs(34), color: '#fff', marginTop: vs(2) },
   tierBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 14,
-    paddingHorizontal: 10, paddingVertical: 5,
+    flexDirection: 'row', alignItems: 'center', gap: s(4),
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: s(14),
+    paddingHorizontal: s(10), paddingVertical: vs(5),
   },
-  tierBadgeText: { fontSize: 13, fontWeight: '700', color: '#fff' },
-  progressWrap: { marginTop: Spacing.lg },
-  progressText: { fontSize: 13, color: 'rgba(255,255,255,0.9)', marginBottom: 6 },
+  tierBadgeText: { fontFamily: 'Inter-Bold', fontSize: fs(13), color: '#fff' },
+  progressWrap: { marginTop: vs(Spacing.lg) },
+  progressText: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: 'rgba(255,255,255,0.9)', marginBottom: vs(6) },
   progressTrack: {
-    height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden',
+    height: vs(6), borderRadius: s(3), backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden',
   },
-  progressFill: { height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  progressFill: { height: vs(6), borderRadius: s(3), backgroundColor: '#fff' },
 
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.black, marginTop: Spacing.xl, marginBottom: Spacing.md },
-  emptyText: { fontSize: 14, color: '#B0B0B0', paddingVertical: Spacing.md },
+  sectionTitle: { fontFamily: 'Inter-Bold', fontSize: fs(18), color: Colors.black, marginTop: vs(Spacing.xl), marginBottom: vs(Spacing.md) },
+  emptyText: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#B0B0B0', paddingVertical: vs(Spacing.md) },
 
   rewardRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    paddingVertical: vs(14), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
   rewardIcon: {
-    width: 44, height: 44, borderRadius: 22,
+    width: s(44), height: s(44), borderRadius: s(22),
     backgroundColor: Colors.primary + '18', alignItems: 'center', justifyContent: 'center',
   },
   rewardInfo: { flex: 1 },
-  rewardName: { fontSize: 16, fontWeight: '600', color: Colors.black },
-  rewardDesc: { fontSize: 13, color: '#7D8A95', marginTop: 2 },
-  rewardCost: { fontSize: 13, fontWeight: '700', color: Colors.primary, marginTop: 4 },
+  rewardName: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.black },
+  rewardDesc: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#7D8A95', marginTop: vs(2) },
+  rewardCost: { fontFamily: 'Inter-Bold', fontSize: fs(13), color: Colors.primary, marginTop: vs(4) },
   redeemBtn: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.base,
-    paddingHorizontal: 16, paddingVertical: 9,
+    backgroundColor: Colors.primary, borderRadius: s(BorderRadius.base),
+    paddingHorizontal: s(16), paddingVertical: vs(9),
   },
   redeemBtnDisabled: { backgroundColor: '#C7CDD2' },
-  redeemBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  redeemBtnText: { fontFamily: 'Inter-Bold', fontSize: fs(14), color: '#fff' },
 
   voucherRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    paddingVertical: vs(14), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
   voucherInfo: { flex: 1 },
-  voucherName: { fontSize: 15, fontWeight: '600', color: Colors.black },
-  voucherCode: { fontSize: 13, color: '#7D8A95', marginTop: 2, letterSpacing: 0.5 },
-  voucherStatus: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  voucherName: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.black },
+  voucherCode: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#7D8A95', marginTop: vs(2), letterSpacing: 0.5 },
+  voucherStatus: { borderRadius: s(12), paddingHorizontal: s(10), paddingVertical: vs(4) },
   voucherActive: { backgroundColor: '#E8F5E9' },
   voucherInactive: { backgroundColor: '#F0F0F0' },
-  voucherStatusText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+  voucherStatusText: { fontFamily: 'Inter-Bold', fontSize: fs(12), textTransform: 'capitalize' },
 });

@@ -15,6 +15,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { supportService, type SupportTicket } from '@/services/supportService';
 
 interface TicketThreadScreenProps {
@@ -183,44 +184,44 @@ export const TicketThreadScreen: React.FC<TicketThreadScreenProps> = ({ navigati
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.sm),
+    paddingHorizontal: s(Spacing.base), paddingVertical: vs(Spacing.md),
     borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: Colors.black },
-  headerSub: { fontSize: 12, color: '#7D8A95', marginTop: 2, textTransform: 'capitalize' },
-  closeBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-Bold', fontSize: fs(16), color: '#1E293B' },
+  headerSub: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: '#7D8A95', marginTop: vs(2), textTransform: 'capitalize' },
+  closeBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  messages: { padding: Spacing.base, flexGrow: 1 },
-  bubbleRow: { marginBottom: Spacing.md, flexDirection: 'row' },
+  messages: { padding: s(Spacing.base), flexGrow: 1 },
+  bubbleRow: { marginBottom: vs(Spacing.md), flexDirection: 'row' },
   rowLeft: { justifyContent: 'flex-start' },
   rowRight: { justifyContent: 'flex-end' },
-  bubble: { maxWidth: '80%', borderRadius: 14, padding: 12 },
-  bubbleMine: { backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
-  bubbleAdmin: { backgroundColor: '#F2F4F5', borderBottomLeftRadius: 4 },
-  adminLabel: { fontSize: 11, fontWeight: '700', color: Colors.primary, marginBottom: 3 },
-  bubbleText: { fontSize: 15, color: Colors.black, lineHeight: 21 },
-  bubbleTime: { fontSize: 10, color: '#9AA5AD', marginTop: 5 },
-  emptyText: { textAlign: 'center', color: '#B0B0B0', marginTop: 40 },
+  bubble: { maxWidth: '80%', borderRadius: s(14), padding: s(12) },
+  bubbleMine: { backgroundColor: Colors.primary, borderBottomRightRadius: s(4) },
+  bubbleAdmin: { backgroundColor: '#F2F4F5', borderBottomLeftRadius: s(4) },
+  adminLabel: { fontFamily: 'Inter-Bold', fontSize: fs(11), color: Colors.primary, marginBottom: vs(3) },
+  bubbleText: { fontFamily: 'Inter-Regular', fontSize: fs(15), color: Colors.black, lineHeight: fs(21) },
+  bubbleTime: { fontFamily: 'Inter-Regular', fontSize: fs(10), color: '#9AA5AD', marginTop: vs(5) },
+  emptyText: { fontFamily: 'Inter-Regular', textAlign: 'center', color: '#B0B0B0', marginTop: vs(40) },
 
   composer: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: Spacing.base, paddingTop: 8,
+    flexDirection: 'row', alignItems: 'flex-end', gap: s(8),
+    paddingHorizontal: s(Spacing.base), paddingTop: vs(8),
     borderTopWidth: 1, borderTopColor: '#F0F0F0',
   },
   input: {
-    flex: 1, maxHeight: 120, minHeight: 44,
-    borderWidth: 1, borderColor: '#E0E0E0', borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.base, paddingTop: 11, paddingBottom: 11,
-    fontSize: 15, color: Colors.black,
+    flex: 1, maxHeight: vs(120), minHeight: vs(44),
+    borderWidth: 1, borderColor: '#E0E0E0', borderRadius: s(BorderRadius.lg),
+    paddingHorizontal: s(Spacing.base), paddingTop: vs(11), paddingBottom: vs(11),
+    fontFamily: 'Inter-Regular', fontSize: fs(15), color: Colors.black,
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary,
+    width: s(44), height: s(44), borderRadius: s(22), backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
-  lockedBar: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
-  lockedText: { fontSize: 13, color: '#7D8A95', textAlign: 'center', lineHeight: 19 },
+  lockedBar: { paddingHorizontal: s(Spacing.xl), paddingTop: vs(Spacing.md), borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+  lockedText: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#7D8A95', textAlign: 'center', lineHeight: fs(19) },
 });

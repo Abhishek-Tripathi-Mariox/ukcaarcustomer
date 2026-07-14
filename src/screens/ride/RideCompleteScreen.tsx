@@ -26,6 +26,8 @@ import { setCurrentRide } from '@/store/slices/rideSlice';
 import { setWalletBalance } from '@/store/slices/appSlice';
 import { rideService } from '@/services/rideService';
 import { paymentService } from '@/services/paymentService';
+import { fs, s, vs } from '@/theme/responsive';
+import { Colors } from '@/theme';
 
 interface RideCompleteScreenProps {
   navigation: any;
@@ -67,22 +69,51 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
   // post-completion values — startedAt, completedAt, actualDuration —
   // even if the socket payload that triggered this screen was missing
   // one of them or was emitted from a path that hadn't finished saving.
+  //
+  // We keep polling (not a one-shot fetch) so the receipt reacts when the
+  // driver swipes "Cash collected": that flips the ride's paymentStatus to
+  // 'completed' on the server, but the socket push only reaches us when our
+  // socket sits on the same backend instance that handled it. In a split /
+  // multi-instance deployment it never arrives — which is the "driver marked
+  // cash collected but nothing updates on the rider side" bug. Once the DB
+  // shows the ride paid, we forward to the success screen automatically.
   const dispatch = useAppDispatch();
+  const paidNavRef = useRef(false);
   useEffect(() => {
     if (!rideId) return;
     let cancelled = false;
-    rideService
-      .getRide(rideId)
-      .then((fresh) => {
-        if (!cancelled && fresh) dispatch(setCurrentRide(fresh));
-      })
-      .catch(() => {
-        /* keep whatever Redux already has */
-      });
+    const tick = async () => {
+      try {
+        const fresh: any = await rideService.getRide(rideId);
+        if (cancelled || !fresh) return;
+        dispatch(setCurrentRide(fresh));
+        // Payment settled server-side (cash-collected by the driver, or an
+        // online payment verified elsewhere). Only auto-advance if the rider
+        // isn't mid-checkout of their own — otherwise let their flow finish.
+        if (
+          fresh.paymentStatus === 'completed' &&
+          !paidNavRef.current &&
+          !processingPayment &&
+          !sheetOpen
+        ) {
+          paidNavRef.current = true;
+          navigation.replace('PaymentSuccess', {
+            amount: n(fresh.actualFare ?? fresh.estimatedFare ?? fare, 0),
+            method: fresh.paymentMethod ?? 'cash',
+            rideId,
+          });
+        }
+      } catch {
+        /* keep whatever Redux already has; next tick retries */
+      }
+    };
+    tick();
+    const id = setInterval(tick, 4000);
     return () => {
       cancelled = true;
+      clearInterval(id);
     };
-  }, [rideId, dispatch]);
+  }, [rideId, dispatch, navigation, fare, processingPayment, sheetOpen]);
 
   // Prefer the backend's actual values (set on completion). Fall back to
   // estimate fields, then to route params, then to defaults. Every numeric
@@ -519,92 +550,92 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.white,
   },
   content: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingHorizontal: s(16),
+    paddingBottom: vs(40),
     alignItems: 'center',
   },
   header: {
-    width: 345,
+    width: s(345),
     alignItems: 'center',
-    marginBottom: 34,
+    marginBottom: vs(34),
   },
   headerText: {
-    marginTop: 16,
+    marginTop: vs(16),
     alignItems: 'center',
   },
   title: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 20,
-    lineHeight: 28,
-    color: '#121212',
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(20),
+    lineHeight: fs(28),
+    color: '#1E293B',
     textAlign: 'center',
   },
   subtitle: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#474747',
+    fontSize: fs(14),
+    lineHeight: fs(22),
+    color: '#2A2A2A',
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: vs(6),
   },
   fareCard: {
-    width: 347,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 19,
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 24,
-    shadowColor: '#000000',
+    width: s(347),
+    backgroundColor: Colors.white,
+    borderRadius: s(19),
+    paddingHorizontal: s(22),
+    paddingTop: vs(22),
+    paddingBottom: vs(24),
+    shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 3,
-    marginBottom: 34,
+    marginBottom: vs(34),
   },
   fareTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 22,
+    fontSize: fs(22),
     color: '#45474A',
-    marginBottom: 24,
+    marginBottom: vs(24),
   },
   metricRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   metricText: {
-    marginLeft: 14,
+    marginLeft: s(14),
   },
   metricLabel: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: '#45474A',
     opacity: 0.5,
-    lineHeight: 20,
+    lineHeight: fs(20),
   },
   metricValue: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
+    fontSize: fs(18),
     color: '#45474A',
-    lineHeight: 24,
-    marginTop: 2,
+    lineHeight: fs(24),
+    marginTop: vs(2),
   },
   divider: {
     height: 1,
     backgroundColor: '#E5E5E5',
-    marginTop: 18,
-    marginBottom: 18,
+    marginTop: vs(18),
+    marginBottom: vs(18),
   },
   timesRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
     backgroundColor: '#F8F9FB',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginTop: 16,
+    borderRadius: s(12),
+    paddingVertical: vs(12),
+    paddingHorizontal: s(14),
+    marginTop: vs(16),
   },
   timeCell: {
     flex: 1,
@@ -612,28 +643,28 @@ const styles = StyleSheet.create({
   timeDivider: {
     width: 1,
     backgroundColor: '#E5E7EB',
-    marginHorizontal: 12,
+    marginHorizontal: s(12),
   },
   timeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: s(6),
+    marginBottom: vs(4),
   },
   timeLabel: {
     fontFamily: 'Inter-Regular',
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#6A7282',
   },
   timeValue: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 15,
+    fontSize: fs(15),
     color: '#101828',
   },
   vehicleLabel: {
-    marginTop: 14,
+    marginTop: vs(14),
     fontFamily: 'Inter-Medium',
-    fontSize: 13,
+    fontSize: fs(13),
     color: '#7D8A95',
   },
   chargeRow: {
@@ -643,19 +674,19 @@ const styles = StyleSheet.create({
   },
   chargeLabel: {
     fontFamily: 'Inter-Medium',
-    fontSize: 16,
+    fontSize: fs(16),
     color: '#45474A',
   },
   chargeValue: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: '#45474A',
   },
   totalDivider: {
     height: 1,
     backgroundColor: '#E5E5E5',
-    marginTop: 18,
-    marginBottom: 14,
+    marginTop: vs(18),
+    marginBottom: vs(14),
   },
   totalRow: {
     flexDirection: 'row',
@@ -664,36 +695,36 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 24,
+    fontSize: fs(24),
     color: '#45474A',
   },
   totalValue: {
     fontFamily: 'Inter-Bold',
-    fontSize: 24,
+    fontSize: fs(24),
     color: '#45474A',
   },
   payButton: {
-    width: 348,
-    height: 62,
-    backgroundColor: '#0097B3',
-    borderRadius: 13,
+    width: s(348),
+    height: vs(62),
+    backgroundColor: Colors.primary,
+    borderRadius: s(13),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 34,
+    marginBottom: vs(34),
   },
   payButtonText: {
     fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontSize: fs(16),
+    color: Colors.white,
   },
   metroCard: {
-    width: 356,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    width: s(356),
+    backgroundColor: Colors.white,
+    borderRadius: s(8),
+    paddingHorizontal: s(24),
+    paddingVertical: vs(14),
     alignItems: 'center',
-    shadowColor: '#000000',
+    shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.05,
     shadowRadius: 12,
@@ -705,15 +736,15 @@ const styles = StyleSheet.create({
   },
   metroText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
+    fontSize: fs(18),
     color: '#212020',
-    marginLeft: 10,
+    marginLeft: s(10),
   },
   metroTotal: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: '#212020',
-    marginTop: 4,
+    marginTop: vs(4),
   },
   metroLink: {
     color: '#015EA3',
@@ -724,16 +755,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: s(32),
   },
   processingCard: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 28,
-    paddingHorizontal: 22,
+    backgroundColor: Colors.white,
+    borderRadius: s(16),
+    paddingVertical: vs(28),
+    paddingHorizontal: s(22),
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.black,
     shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -741,29 +772,29 @@ const styles = StyleSheet.create({
   },
   processingText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 17,
+    fontSize: fs(17),
     color: '#101828',
-    marginTop: 14,
+    marginTop: vs(14),
   },
   processingHint: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: '#6A7282',
     textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 18,
+    marginTop: vs(8),
+    lineHeight: fs(18),
   },
   processingCancel: {
-    marginTop: 16,
-    paddingHorizontal: 28,
-    paddingVertical: 10,
-    borderRadius: 10,
+    marginTop: vs(16),
+    paddingHorizontal: s(28),
+    paddingVertical: vs(10),
+    borderRadius: s(10),
     borderWidth: 1.4,
-    borderColor: '#EF4444',
+    borderColor: Colors.error,
   },
   processingCancelText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
-    color: '#EF4444',
+    fontSize: fs(14),
+    color: Colors.error,
   },
 });

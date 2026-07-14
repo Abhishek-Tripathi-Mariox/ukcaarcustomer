@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, BorderRadius } from '@/theme';
+import { Colors, Spacing, BorderRadius, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setPickup, setDropoff } from '@/store/slices/rideSlice';
 import { geoService, GeoSuggestion } from '@/services/geoService';
@@ -226,7 +227,7 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
           activeOpacity={1}
           onPress={onClose}
         />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + vs(16) }]}>
           <View style={styles.handle} />
 
           <View style={styles.headerRow}>
@@ -234,12 +235,12 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
               {isPickup ? 'Set pickup location' : 'Where to?'}
             </Text>
             <TouchableOpacity onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color={Colors.textSecondary} />
+              <Ionicons name="close" size={s(22)} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.searchBox}>
-            <Ionicons name="search" size={18} color={Colors.textMuted} />
+            <Ionicons name="search" size={s(18)} color={Colors.textMuted} />
             <TextInput
               ref={inputRef}
               style={styles.searchInput}
@@ -256,7 +257,7 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
             />
             {query.length > 0 && (
               <TouchableOpacity onPress={() => setQuery('')} hitSlop={10}>
-                <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+                <Ionicons name="close-circle" size={s(18)} color={Colors.textMuted} />
               </TouchableOpacity>
             )}
           </View>
@@ -299,7 +300,7 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
                 >
                   <Ionicons
                     name={(item.icon as any) || 'location'}
-                    size={18}
+                    size={s(18)}
                     color={
                       item.source === 'gps'
                         ? Colors.white
@@ -327,92 +328,92 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: alpha(Colors.black, 0.45),
     justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    borderTopLeftRadius: s(24),
+    borderTopRightRadius: s(24),
+    paddingHorizontal: s(20),
+    paddingTop: vs(10),
     maxHeight: '85%',
     minHeight: '60%',
   },
   handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D9D9D9',
+    width: s(40),
+    height: vs(4),
+    borderRadius: s(2),
+    backgroundColor: Colors.border,
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: vs(12),
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: vs(16), // replacing Spacing.md
   },
   title: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: Colors.textPrimary,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: s(10),
     backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderRadius: BorderRadius.md, // s(8)
+    paddingHorizontal: s(12),
+    paddingVertical: vs(10),
+    marginBottom: vs(12),
   },
   searchInput: {
     flex: 1,
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textPrimary,
     padding: 0,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
+    gap: s(8),
+    paddingVertical: vs(6),
   },
   statusText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.textSecondary,
   },
   errorText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
-    color: Colors.dropoffRed,
-    paddingVertical: 6,
+    fontSize: fs(13),
+    color: Colors.error, // replacing dropoffRed
+    paddingVertical: vs(6),
   },
   emptyText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 13,
+    fontSize: fs(13),
     color: Colors.textMuted,
     textAlign: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    lineHeight: 18,
+    paddingVertical: vs(24),
+    paddingHorizontal: s(16),
+    lineHeight: fs(18),
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
+    gap: s(12),
+    paddingVertical: vs(12),
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
   rowIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: s(36),
+    height: s(36),
+    borderRadius: s(18),
     backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
@@ -425,13 +426,13 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textPrimary,
   },
   rowAddress: {
     fontFamily: 'Inter-Regular',
-    fontSize: 12,
+    fontSize: fs(12),
     color: Colors.textMuted,
-    marginTop: 2,
+    marginTop: vs(2),
   },
 });

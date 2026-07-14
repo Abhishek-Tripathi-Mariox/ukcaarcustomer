@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -133,25 +134,25 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
+    paddingHorizontal: s(Spacing.base), paddingVertical: vs(Spacing.md),
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
+  backBtn: { width: s(36), height: s(36), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-Bold', fontSize: fs(20), color: '#1E293B' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { padding: Spacing.xl, paddingTop: Spacing.md, flexGrow: 1 },
+  list: { padding: s(Spacing.xl), paddingTop: vs(Spacing.md), flexGrow: 1 },
 
   card: {
-    borderWidth: 1, borderColor: '#EEE', borderRadius: BorderRadius.lg,
-    padding: Spacing.base, marginBottom: Spacing.md,
+    borderWidth: 1, borderColor: '#EEE', borderRadius: s(BorderRadius.lg),
+    padding: s(Spacing.base), marginBottom: vs(Spacing.md),
   },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  subject: { flex: 1, fontSize: 16, fontWeight: '600', color: Colors.black },
-  badge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  ticketNo: { fontSize: 12, color: '#7D8A95', marginTop: 4, letterSpacing: 0.5 },
-  desc: { fontSize: 14, color: '#7D8A95', marginTop: 6, lineHeight: 20 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(8) },
+  subject: { flex: 1, fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.black },
+  badge: { borderRadius: s(12), paddingHorizontal: s(10), paddingVertical: vs(4) },
+  badgeText: { fontFamily: 'Inter-Bold', fontSize: fs(12) },
+  ticketNo: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: '#7D8A95', marginTop: vs(4), letterSpacing: 0.5 },
+  desc: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#7D8A95', marginTop: vs(6), lineHeight: fs(20) },
 
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 8 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: '#7D8A95' },
-  emptySub: { fontSize: 13, color: '#B0B0B0', textAlign: 'center', paddingHorizontal: 40, lineHeight: 19 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: vs(80), gap: s(8) },
+  emptyText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: '#7D8A95' },
+  emptySub: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#B0B0B0', textAlign: 'center', paddingHorizontal: s(40), lineHeight: fs(19) },
 });

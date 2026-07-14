@@ -12,11 +12,12 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
+import { Typography, Colors, Spacing, BorderRadius } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius } from '@/theme';
 import { useAppSelector } from '@/store/hooks';
 import { safetyService } from '@/services/safetyService';
 
@@ -334,91 +335,91 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
+    paddingHorizontal: s(Spacing.base), paddingVertical: vs(Spacing.md),
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  content: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing['3xl'] },
+  backBtn: { width: s(36), height: s(36), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-Bold', fontSize: fs(20), color: '#1E293B' },
+  content: { paddingHorizontal: s(Spacing.xl), paddingBottom: vs(Spacing['3xl']) },
 
   // SOS
   sosCard: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    backgroundColor: '#F44336', borderRadius: BorderRadius.lg,
-    padding: Spacing.lg, marginBottom: Spacing.xl,
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    backgroundColor: '#F44336', borderRadius: s(BorderRadius.lg),
+    padding: s(Spacing.lg), marginBottom: vs(Spacing.xl),
   },
   sosIconWrap: {
-    width: 48, height: 48, borderRadius: 24,
+    width: s(48), height: s(48), borderRadius: s(24),
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
   sosInfo: { flex: 1 },
-  sosTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  sosDesc: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 18 },
+  sosTitle: { fontFamily: 'Inter-Bold', fontSize: fs(18), color: '#fff' },
+  sosDesc: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: 'rgba(255,255,255,0.85)', marginTop: vs(2), lineHeight: fs(18) },
 
   // Section
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.black, marginTop: Spacing.xl, marginBottom: Spacing.sm },
-  sectionDesc: { fontSize: 14, color: '#7D8A95', marginBottom: Spacing.md, lineHeight: 20 },
+  sectionTitle: { fontFamily: 'Inter-Bold', fontSize: fs(18), color: Colors.black, marginTop: vs(Spacing.xl), marginBottom: vs(Spacing.sm) },
+  sectionDesc: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#7D8A95', marginBottom: vs(Spacing.md), lineHeight: fs(20) },
 
   // Feature
   featureRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    paddingVertical: vs(16), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
   featureIcon: {
-    width: 44, height: 44, borderRadius: 22,
+    width: s(44), height: s(44), borderRadius: s(22),
     alignItems: 'center', justifyContent: 'center',
   },
   featureInfo: { flex: 1 },
-  featureLabel: { fontSize: 16, fontWeight: '600', color: Colors.black },
-  featureDesc: { fontSize: 13, color: '#7D8A95', marginTop: 2 },
+  featureLabel: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.black },
+  featureDesc: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#7D8A95', marginTop: vs(2) },
   activeBadge: {
-    backgroundColor: '#E8F5E9', borderRadius: 12,
-    paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: '#E8F5E9', borderRadius: s(12),
+    paddingHorizontal: s(10), paddingVertical: vs(4),
   },
-  activeBadgeText: { fontSize: 12, fontWeight: '600', color: '#4CAF50' },
+  activeBadgeText: { fontFamily: 'Inter-SemiBold', fontSize: fs(12), color: '#4CAF50' },
 
   // Contacts
   contactRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    paddingVertical: vs(14), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
   contactAvatar: {
-    width: 40, height: 40, borderRadius: 20,
+    width: s(40), height: s(40), borderRadius: s(20),
     backgroundColor: Colors.primary + '18',
     alignItems: 'center', justifyContent: 'center',
   },
-  contactInitial: { fontSize: 16, fontWeight: '700', color: Colors.primary },
+  contactInitial: { fontFamily: 'Inter-Bold', fontSize: fs(16), color: Colors.primary },
   contactInfo: { flex: 1 },
-  contactName: { fontSize: 16, fontWeight: '600', color: Colors.black },
-  contactPhone: { fontSize: 13, color: '#7D8A95', marginTop: 2 },
+  contactName: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.black },
+  contactPhone: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#7D8A95', marginTop: vs(2) },
 
-  emptyContacts: { alignItems: 'center', paddingVertical: Spacing.xl, gap: 8 },
-  emptyText: { fontSize: 14, color: '#B0B0B0' },
+  emptyContacts: { alignItems: 'center', paddingVertical: vs(Spacing.xl), gap: s(8) },
+  emptyText: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#B0B0B0' },
 
   addContactBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    paddingVertical: Spacing.md,
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.sm),
+    paddingVertical: vs(Spacing.md),
   },
-  addContactText: { fontSize: 16, fontWeight: '600', color: Colors.primary },
+  addContactText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.primary },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet: { justifyContent: 'flex-end' },
   modalContent: {
-    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: Spacing.xl, paddingBottom: Spacing['3xl'],
+    backgroundColor: '#fff', borderTopLeftRadius: s(24), borderTopRightRadius: s(24),
+    padding: s(Spacing.xl), paddingBottom: vs(Spacing['3xl']),
   },
-  modalTitle: { fontSize: 22, fontWeight: '700', color: Colors.black, textAlign: 'center', marginBottom: Spacing.lg },
-  fieldLabel: { fontSize: 14, fontWeight: '600', color: '#7D8A95', marginBottom: 6, marginTop: Spacing.md },
+  modalTitle: { fontFamily: 'Inter-Bold', fontSize: fs(22), color: Colors.black, textAlign: 'center', marginBottom: vs(Spacing.lg) },
+  fieldLabel: { fontFamily: 'Inter-SemiBold', fontSize: fs(14), color: '#7D8A95', marginBottom: vs(6), marginTop: vs(Spacing.md) },
   fieldInput: {
-    height: 52, borderWidth: 1, borderColor: '#E0E0E0', borderRadius: BorderRadius.base,
-    paddingHorizontal: Spacing.base, fontSize: 16, color: Colors.black,
+    height: vs(52), borderWidth: 1, borderColor: '#E0E0E0', borderRadius: s(BorderRadius.base),
+    paddingHorizontal: s(Spacing.base), fontFamily: 'Inter-Regular', fontSize: fs(16), color: Colors.black,
   },
   saveBtn: {
-    height: 56, backgroundColor: Colors.primary, borderRadius: BorderRadius.button,
-    alignItems: 'center', justifyContent: 'center', marginTop: Spacing.xl,
+    height: vs(56), backgroundColor: Colors.primary, borderRadius: s(BorderRadius.button),
+    alignItems: 'center', justifyContent: 'center', marginTop: vs(Spacing.xl),
   },
-  saveBtnText: { fontSize: 18, fontWeight: '600', color: '#fff' },
-  cancelBtn: { height: 48, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
-  cancelBtnText: { fontSize: 16, fontWeight: '500', color: '#7D8A95' },
+  saveBtnText: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: '#fff' },
+  cancelBtn: { height: vs(48), alignItems: 'center', justifyContent: 'center', marginTop: vs(Spacing.sm) },
+  cancelBtnText: { fontFamily: 'Inter-Medium', fontSize: fs(16), color: '#7D8A95' },
 });

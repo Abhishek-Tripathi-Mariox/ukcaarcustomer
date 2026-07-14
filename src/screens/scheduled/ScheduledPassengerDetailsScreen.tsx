@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '@/theme';
+import { Colors, Shadow, alpha } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { KeyboardAwareScrollView } from '@/components/common';
 import { useAppSelector } from '@/store/hooks';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
@@ -129,16 +130,12 @@ export const ScheduledPassengerDetailsScreen: React.FC<Props> = ({ navigation, r
 
             <Text style={styles.label}>Full Name</Text>
             <View style={styles.inputBox}>
-              <Ionicons
-                name="person-outline"
-                size={18}
-                color="rgba(0,0,0,0.3)"
-              />
+              <Ionicons name="person-outline" size={s(18)} color={Colors.textMuted} />
               <TextInput
                 value={p.name}
                 onChangeText={(t) => updatePassenger(idx, 'name', t)}
-                placeholder="Enter Full Name"
-                placeholderTextColor="rgba(0,0,0,0.3)"
+                placeholder="Enter passenger name"
+                placeholderTextColor={Colors.textMuted}
                 style={styles.input}
               />
             </View>
@@ -147,14 +144,14 @@ export const ScheduledPassengerDetailsScreen: React.FC<Props> = ({ navigation, r
             <View style={styles.inputBox}>
               <Ionicons
                 name="call-outline"
-                size={18}
-                color="rgba(0,0,0,0.3)"
+                size={s(18)}
+                color={Colors.textMuted}
               />
               <TextInput
                 value={p.contact}
                 onChangeText={(t) => updatePassenger(idx, 'contact', t)}
                 placeholder="Enter contact number"
-                placeholderTextColor="rgba(0,0,0,0.3)"
+                placeholderTextColor={Colors.textMuted}
                 keyboardType="phone-pad"
                 style={styles.input}
               />
@@ -180,125 +177,112 @@ export const ScheduledPassengerDetailsScreen: React.FC<Props> = ({ navigation, r
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: Colors.backgroundCard },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(18),
     color: Colors.white,
     flex: 1,
     textAlign: 'center',
   },
 
-  content: { padding: 16, paddingBottom: 120 },
+  content: { padding: s(16), paddingBottom: vs(120) },
 
-  // Card — Figma node 71:1549 (gray-tinted at 20% opacity → effectively
-  // a light fill on white). 17px radius, ample internal padding.
   card: {
-    backgroundColor: 'rgba(217,217,217,0.2)',
-    borderRadius: 17,
-    paddingHorizontal: 16,
-    paddingTop: 22,
-    paddingBottom: 24,
-    marginBottom: 16,
+    backgroundColor: Colors.white,
+    borderRadius: s(17),
+    paddingHorizontal: s(16),
+    paddingTop: vs(22),
+    paddingBottom: vs(24),
+    marginBottom: vs(16),
+    ...Shadow.sm,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: vs(16),
   },
   routeName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: '#000000',
-    opacity: 0.8,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(18),
+    color: Colors.textPrimary,
     flex: 1,
-    marginRight: 12,
+    marginRight: s(12),
   },
   seatBadge: {
     backgroundColor: Colors.primary,
-    height: 31,
-    minWidth: 71,
-    borderRadius: 8,
+    height: vs(31),
+    minWidth: s(71),
+    borderRadius: s(8),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: s(10),
   },
   seatBadgeText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(14),
     color: Colors.white,
   },
 
   label: {
-    fontFamily: 'Poppins-Light',
-    fontSize: 14,
-    color: '#000000',
-    opacity: 0.8,
-    marginBottom: 8,
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(14),
+    color: Colors.textSecondary,
+    marginBottom: vs(8),
   },
-  // 56px white input with hairline border, matches Figma node 70:9251.
   inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: s(12),
     backgroundColor: Colors.white,
-    borderRadius: 12,
+    borderRadius: s(12),
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.14)',
-    paddingHorizontal: 18,
-    height: 56,
+    borderColor: Colors.borderLight,
+    paddingHorizontal: s(18),
+    height: vs(56),
   },
   input: {
     flex: 1,
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: '#000000',
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(14),
+    color: Colors.textPrimary,
     padding: 0,
   },
 
-  // Footer — white card pinned to bottom with a top-only shadow.
   footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    backgroundColor: Colors.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(18),
+    backgroundColor: Colors.backgroundCard,
+    ...Shadow.top,
   },
   cta: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    height: 56,
+    borderRadius: s(8),
+    height: vs(56),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Disabled (no fields filled) matches Figma node I70:8985;12:13:
-  // #333 at 10% opacity over white = a light grey fill with dark grey text.
   ctaDisabled: {
-    backgroundColor: 'rgba(51,51,51,0.1)',
+    opacity: 0.5,
   },
   ctaText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 14,
-    lineHeight: 24,
-    letterSpacing: -0.3,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(16),
     color: Colors.white,
   },
-  ctaTextDisabled: { color: '#333' },
+  ctaTextDisabled: { color: Colors.white },
 });

@@ -11,6 +11,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Colors } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 
 const LOCATION_PERM =
   Platform.OS === 'ios'
@@ -106,29 +107,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.error ?? '#D64545',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 10,
-    marginTop: 10,
-    borderRadius: 10,
+    paddingHorizontal: s(12),
+    paddingVertical: vs(10),
+    gap: s(10),
+    marginTop: vs(10),
+    borderRadius: s(10),
   },
   text: {
     flex: 1,
     color: Colors.white ?? '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(13),
+    lineHeight: fs(17),
   },
   button: {
     backgroundColor: Colors.white ?? '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
+    paddingHorizontal: s(14),
+    paddingVertical: vs(7),
+    borderRadius: s(8),
   },
   buttonText: {
     color: Colors.error ?? '#D64545',
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(13),
   },
 });
 

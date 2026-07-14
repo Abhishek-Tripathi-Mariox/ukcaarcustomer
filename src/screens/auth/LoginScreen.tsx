@@ -145,17 +145,17 @@ const styles = StyleSheet.create({
     borderRadius: s(80),
   },
   title: {
+    fontFamily: 'Inter-ExtraBold', // figma design looks very bold here
     fontSize: fs(30),
-    fontWeight: '800',
     lineHeight: fs(40),
-    color: Colors.black,
+    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: vs(Spacing.md),
   },
   subtitle: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(16),
-    fontWeight: '400',
-    color: '#7D8A95',
+    color: Colors.textPrimary,
     textAlign: 'center',
     lineHeight: fs(24),
     letterSpacing: 0,
@@ -179,10 +179,10 @@ const styles = StyleSheet.create({
   },
   phoneTextInput: {
     flex: 1,
+    fontFamily: 'Inter-Regular',
     fontSize: fs(18),
-    fontWeight: '400',
     lineHeight: fs(26),
-    color: Colors.textOnLight,
+    color: Colors.textPrimary,
     height: '100%',
   },
   ctaButton: {
@@ -198,14 +198,14 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   ctaText: {
+    fontFamily: 'Inter-Medium',
     fontSize: fs(18),
-    fontWeight: '600',
     lineHeight: fs(24),
     color: Colors.textOnPrimary,
   },
   terms: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(14),
-    fontWeight: '400',
     color: Colors.termsMuted,
     textAlign: 'center',
     lineHeight: fs(22),
@@ -214,6 +214,7 @@ const styles = StyleSheet.create({
     color: Colors.link,
   },
   errorText: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(14),
     color: Colors.error,
     textAlign: 'center',

@@ -9,10 +9,12 @@ import {
   Switch,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
+import { Colors, Spacing, BorderRadius } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform } from 'react-native';
 import {
   check,
   request,
@@ -20,7 +22,6 @@ import {
   RESULTS,
 } from 'react-native-permissions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius } from '@/theme';
 import { authService } from '@/services/authService';
 
 const hasAndroidNotifPerm = Platform.OS === 'android' && Platform.Version >= 33;
@@ -348,45 +349,45 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.md,
+    paddingHorizontal: s(Spacing.base), paddingVertical: vs(Spacing.md),
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.black },
-  content: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing['3xl'] },
+  backBtn: { width: s(36), height: s(36), alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: 'Inter-Bold', fontSize: fs(20), color: '#1E293B' },
+  content: { paddingHorizontal: s(Spacing.xl), paddingBottom: vs(Spacing['3xl']) },
 
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.black, marginTop: Spacing.xl, marginBottom: Spacing.md },
+  sectionTitle: { fontFamily: 'Inter-Bold', fontSize: fs(18), color: '#1E293B', marginTop: vs(Spacing.xl), marginBottom: vs(Spacing.md) },
 
   // Info row
   infoRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    paddingVertical: vs(14), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
-  infoLabel: { fontSize: 15, color: '#7D8A95' },
-  infoValue: { fontSize: 15, fontWeight: '600', color: Colors.black },
+  infoLabel: { fontFamily: 'Inter-Regular', fontSize: fs(15), color: '#7D8A95' },
+  infoValue: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.black },
 
   // Setting row
   settingRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    paddingVertical: vs(16), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
   settingIcon: {
-    width: 44, height: 44, borderRadius: 22,
+    width: s(44), height: s(44), borderRadius: s(22),
     alignItems: 'center', justifyContent: 'center',
   },
   settingInfo: { flex: 1 },
-  settingLabel: { fontSize: 16, fontWeight: '600', color: Colors.black },
-  settingDesc: { fontSize: 13, color: '#7D8A95', marginTop: 2 },
+  settingLabel: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.black },
+  settingDesc: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: '#7D8A95', marginTop: vs(2) },
 
   // Logout & Delete
   logoutRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    paddingVertical: vs(16), borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
   },
-  logoutText: { fontSize: 16, fontWeight: '600', color: '#F44336' },
+  logoutText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: '#F44336' },
   deleteRow: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingVertical: 16,
-    marginBottom: Spacing.xl,
+    flexDirection: 'row', alignItems: 'center', gap: s(Spacing.md),
+    paddingVertical: vs(16),
+    marginBottom: vs(Spacing.xl),
   },
-  deleteText: { fontSize: 16, fontWeight: '600', color: '#F44336' },
+  deleteText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: '#F44336' },
 });

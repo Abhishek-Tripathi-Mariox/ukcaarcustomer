@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Colors } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 
 interface CancelReasonScreenProps {
   navigation: any;
@@ -104,81 +106,81 @@ export const CancelReasonScreen: React.FC<CancelReasonScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.white,
   },
   header: {
-    backgroundColor: '#0097B3',
-    paddingBottom: 14,
-    paddingHorizontal: 12,
+    backgroundColor: Colors.primary,
+    paddingBottom: vs(14),
+    paddingHorizontal: s(12),
     flexDirection: 'row',
     alignItems: 'center',
   },
   backBtn: {
-    padding: 8,
+    padding: s(8),
   },
   headerTitle: {
     fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    lineHeight: 20,
-    color: '#FFFFFF',
-    marginLeft: 4,
+    fontSize: fs(16),
+    lineHeight: fs(20),
+    color: Colors.white,
+    marginLeft: s(4),
   },
   title: {
     fontFamily: 'Inter-Medium',
-    fontSize: 18,
-    lineHeight: 28,
-    color: '#121212',
-    paddingHorizontal: 20,
-    marginTop: 18,
-    marginBottom: 6,
+    fontSize: fs(18),
+    lineHeight: fs(28),
+    color: Colors.textPrimary,
+    paddingHorizontal: s(20),
+    marginTop: vs(18),
+    marginBottom: vs(6),
   },
   list: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 24,
+    paddingHorizontal: s(20),
+    paddingTop: vs(8),
+    paddingBottom: vs(24),
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 13,
+    paddingVertical: vs(13),
   },
   radioOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: s(18),
+    height: s(18),
+    borderRadius: s(9),
     borderWidth: 1.5,
-    borderColor: '#0097B3',
+    borderColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioInner: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: '#0097B3',
+    width: s(9),
+    height: s(9),
+    borderRadius: s(4.5),
+    backgroundColor: Colors.primary,
   },
   reasonText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#121212',
+    fontSize: fs(14),
+    color: Colors.textPrimary,
     opacity: 0.8,
-    marginLeft: 16,
+    marginLeft: s(16),
   },
   bottomBar: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: s(24),
+    paddingTop: vs(12),
+    backgroundColor: Colors.white,
   },
   cancelButton: {
-    height: 48,
-    backgroundColor: '#0097B3',
-    borderRadius: 8,
+    height: vs(48),
+    backgroundColor: Colors.primary,
+    borderRadius: s(8),
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelButtonText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 18,
-    color: '#FFFFFF',
+    fontSize: fs(18),
+    color: Colors.white,
   },
 });

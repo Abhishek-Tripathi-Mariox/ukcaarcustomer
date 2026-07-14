@@ -8,6 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { Colors, Typography } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 import { useAppSelector } from '@/store/hooks';
 import { useResolveLocation } from '@/hooks/useResolveLocation';
 
@@ -106,18 +107,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    width: 213,
-    height: 213,
+    width: s(213),
+    height: s(213),
   },
   tagline: {
     position: 'absolute',
-    bottom: 50,
-    fontSize: 16,
-    fontWeight: '500',
+    bottom: vs(50),
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(16),
     color: Colors.white,
     textAlign: 'center',
     letterSpacing: 0.5,
     textTransform: 'capitalize',
-    lineHeight: 23,
+    lineHeight: fs(23),
   },
 });

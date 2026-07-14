@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '@/theme';
+import { fs, s, vs } from '@/theme/responsive';
 
 export interface Rider {
   id: string;
@@ -32,6 +34,7 @@ export const BookingRideForSheet: React.FC<BookingRideForSheetProps> = ({
   onClose,
   onDone,
 }) => {
+  const insets = useSafeAreaInsets();
   const [riders, setRiders] = useState<Rider[]>(DEFAULT_RIDERS);
   const [selectedId, setSelectedId] = useState<string>('myself');
   // Inline "add new rider" form state.
@@ -91,7 +94,7 @@ export const BookingRideForSheet: React.FC<BookingRideForSheetProps> = ({
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + vs(24) }]}>
           <Text style={styles.title}>Booking ride for</Text>
 
           <View style={styles.riderList}>
@@ -105,7 +108,7 @@ export const BookingRideForSheet: React.FC<BookingRideForSheetProps> = ({
                   onPress={() => setSelectedId(rider.id)}
                 >
                   <View style={styles.avatarCircle}>
-                    <Ionicons name="person-outline" size={20} color={Colors.borderDark} />
+                    <Ionicons name="person-outline" size={s(20)} color={Colors.borderDark} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.riderName}>{rider.name}</Text>
@@ -170,7 +173,7 @@ export const BookingRideForSheet: React.FC<BookingRideForSheetProps> = ({
               activeOpacity={0.7}
               onPress={() => setAdding(true)}
             >
-              <Ionicons name="person-add-outline" size={20} color={Colors.link} />
+              <Ionicons name="person-add-outline" size={s(20)} color={Colors.link} />
               <Text style={styles.addNewText}>Add new rider</Text>
             </TouchableOpacity>
           )}
@@ -205,32 +208,32 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
+    borderTopLeftRadius: s(24),
+    borderTopRightRadius: s(24),
+    paddingHorizontal: s(20),
+    paddingTop: vs(24),
+    paddingBottom: vs(24),
   },
   title: {
     fontFamily: 'Inter-Bold',
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: fs(20),
+    lineHeight: fs(28),
     color: Colors.textPrimary,
-    marginBottom: Spacing.lg,
+    marginBottom: vs(16), // replacing Spacing.lg
   },
   riderList: {
-    marginBottom: 8,
+    marginBottom: vs(8),
   },
   riderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    gap: 14,
+    paddingVertical: vs(12),
+    gap: s(14),
   },
   avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: s(36),
+    height: s(36),
+    borderRadius: s(18),
     borderWidth: 1.5,
     borderColor: Colors.borderDark,
     alignItems: 'center',
@@ -238,20 +241,20 @@ const styles = StyleSheet.create({
   },
   riderName: {
     fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: fs(16),
+    lineHeight: fs(22),
     color: Colors.textPrimary,
   },
   riderPhone: {
     fontFamily: 'Inter-Regular',
-    fontSize: 12,
+    fontSize: fs(12),
     color: Colors.textMuted,
     marginTop: 1,
   },
   radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: s(22),
+    height: s(22),
+    borderRadius: s(11),
     borderWidth: 1.5,
     borderColor: Colors.border,
     alignItems: 'center',
@@ -262,46 +265,48 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   radioInner: {
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
+    width: s(11),
+    height: s(11),
+    borderRadius: s(5.5),
     backgroundColor: Colors.success,
   },
   addNewRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    marginBottom: 8,
+    gap: s(10),
+    paddingVertical: vs(12),
+    marginBottom: vs(8),
   },
   addNewText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: fs(15),
+    lineHeight: fs(20),
     color: Colors.link,
   },
   addForm: {
-    marginBottom: 8,
-    gap: 10,
+    marginBottom: vs(8),
+    gap: vs(10),
   },
   addInput: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 48,
+    borderRadius: s(10),
+    paddingHorizontal: s(14),
+    height: vs(48),
     fontFamily: 'Inter-Regular',
-    fontSize: 15,
+    fontSize: fs(15),
     color: Colors.textPrimary,
   },
   addActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: s(12),
+    marginTop: vs(8),
+    marginBottom: vs(8),
   },
   addCancelBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: 10,
+    height: vs(48),
+    borderRadius: s(10),
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
@@ -309,46 +314,46 @@ const styles = StyleSheet.create({
   },
   addCancelText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.textSecondary,
   },
   addSaveBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: 10,
+    height: vs(48),
+    borderRadius: s(10),
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addSaveText: {
     fontFamily: 'Inter-SemiBold',
-    fontSize: 14,
+    fontSize: fs(14),
     color: Colors.white,
   },
   disclaimerBox: {
-    backgroundColor: '#EDEDED',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: Spacing.lg,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: s(10),
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
+    marginBottom: vs(16), // replacing Spacing.lg
   },
   disclaimerText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: fs(14),
+    lineHeight: fs(20),
     color: Colors.textSecondary,
   },
   doneButton: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    height: 56,
+    borderRadius: s(10),
+    height: vs(56),
     alignItems: 'center',
     justifyContent: 'center',
   },
   doneText: {
     fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    lineHeight: 23,
+    fontSize: fs(16),
+    lineHeight: fs(23),
     color: Colors.white,
   },
 });

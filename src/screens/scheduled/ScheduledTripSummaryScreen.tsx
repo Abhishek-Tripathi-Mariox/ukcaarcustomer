@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,12 @@ import {
   ScrollView,
   StatusBar,
   ActivityIndicator,
+  Modal,
+  Share,
+  Platform,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { WebView } from 'react-native-webview';
 import { SafeQR } from '@/components/SafeQR';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow, alpha } from '@/theme';
@@ -42,6 +46,7 @@ interface Props {
       bookingId?: string;
       /** Driver/vehicle the seats are on (per-vehicle validation). */
       driverId?: string;
+      status?: string;
     };
   };
 }
@@ -78,8 +83,17 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
   const user = useAppSelector((s) => s.auth.user);
   const params = route.params ?? {};
   const scheduledRoute = params.route;
-  // Booking-flow entry carries the full route object; Activity entry doesn't.
-  const isBookingMode = !!scheduledRoute;
+
+  const [ride, setRide] = useState<Ride | null>(null);
+
+  const isFinished =
+    params.status === 'completed' ||
+    params.status === 'cancelled' ||
+    ride?.status === 'completed' ||
+    ride?.status === 'cancelled';
+
+  // Booking-flow entry carries the full route object and is active (`!isFinished`).
+  const isBookingMode = !!scheduledRoute && !isFinished;
 
   const seats = params.seats ?? [];
   const passengers = params.passengers ?? [];
@@ -93,8 +107,8 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
   // fetch entirely for them.
   const canFetchRide = !!params.rideId && !params.rideId.startsWith('sched_');
 
-  const [ride, setRide] = useState<Ride | null>(null);
   const [loading, setLoading] = useState(!isBookingMode && canFetchRide);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
 
   useEffect(() => {
     const id = params.rideId;
@@ -208,16 +222,126 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
   };
 
+  const invoiceHtml = useMemo(() => {
+    const inv = ticketRef || (bookingId ? `UKC-${bookingId.slice(-8).toUpperCase()}` : '3UKCAAR1234');
+    const paymentMethod = (ride?.paymentMethod || 'UPI').toString().toUpperCase();
+    const rows: string[] = [];
+    if (isBookingMode && pricePerSeat > 0) {
+      rows.push(`<tr><td>Ticket Price (${seats.length} × ₹${pricePerSeat})</td><td class="r">₹${seats.length * pricePerSeat}</td></tr>`);
+      if (returnDeparture) {
+        rows.push(`<tr><td>Return leg (${seats.length} × ₹${pricePerSeat})</td><td class="r">₹${seats.length * pricePerSeat}</td></tr>`);
+      }
+    } else {
+      rows.push(`<tr><td>Base Fare</td><td class="r">₹${scheduledRoute?.price ?? total}</td></tr>`);
+      if (total > (scheduledRoute?.price ?? total)) {
+        rows.push(`<tr><td>Distance Charge</td><td class="r">₹${total - (scheduledRoute?.price ?? total)}</td></tr>`);
+      }
+    }
+
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Invoice ${inv}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, Roboto, Arial, sans-serif; margin: 0; padding: 20px; color: #101828; background: #fff; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .brand { display:flex; align-items:center; justify-content:space-between; border-bottom: 2px solid #0097B3; padding-bottom: 12px; margin-bottom: 18px; }
+  .brand h1 { font-size: 22px; margin: 0; color: #0097B3; letter-spacing: 0.5px; }
+  .brand .sub { font-size: 12px; color: #6A7282; margin-top: 4px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; font-size: 13px; }
+  .meta .label { color: #6A7282; }
+  .meta .val { color: #101828; font-weight: 600; }
+  h2 { font-size: 14px; color: #45474A; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .loc { background: #F8F9FB; border-radius: 10px; padding: 12px 14px; font-size: 13px; }
+  .loc .row { display:flex; gap:10px; align-items:flex-start; }
+  .loc .row + .row { margin-top: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; margin-top:4px; flex-shrink: 0; }
+  .dot.pick { background: #219EBC; }
+  .dot.drop { background: #EF4444; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 8px 0; border-bottom: 1px solid #F1F3F5; }
+  td.r { text-align: right; font-weight: 600; }
+  tr.total td { border-top: 2px solid #101828; border-bottom: none; padding-top: 12px; font-size: 16px; font-weight: 700; color: #0097B3; }
+  .foot { margin-top: 24px; font-size: 11px; color: #6A7282; text-align: center; line-height: 1.5; }
+  .pill { display: inline-block; background: #EFF6FF; color: #155DFC; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+</style></head>
+<body><div class="wrap">
+  <div class="brand">
+    <div>
+      <h1>UKCAAR</h1>
+      <div class="sub">Tax Invoice / Scheduled Trip Ticket</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:13px;font-weight:700">${inv}</div>
+      <div style="font-size:12px;color:#6A7282;margin-top:4px">${dateLabel}</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div><div class="label">Trip Status</div><div class="val"><span class="pill">${statusLabel}</span></div></div>
+    <div><div class="label">Payment Method</div><div class="val">${paymentMethod}</div></div>
+    <div><div class="label">Departure Time</div><div class="val">${depTime}</div></div>
+    <div><div class="label">Duration • Distance</div><div class="val">${durationMin > 0 ? durationMin + ' min' : '50 min'} • ${distanceKm > 0 ? distanceKm.toFixed(1) + ' km' : '4.3 km'}</div></div>
+  </div>
+
+  <h2>Route Details</h2>
+  <div class="loc">
+    <div class="row"><div class="dot pick"></div><div><div style="color:#6A7282;font-size:11px">Boarding</div><div>${fromName}</div></div></div>
+    <div class="row"><div class="dot drop"></div><div><div style="color:#6A7282;font-size:11px">Dropping</div><div>${toName}</div></div></div>
+  </div>
+
+  ${seats.length > 0 ? `
+  <h2>Seats & Passengers</h2>
+  <div class="loc">
+    <div style="font-weight:600;margin-bottom:6px">Seats: ${seats.join(', ')}</div>
+    ${passengers.map((p) => `<div style="font-size:12px;color:#4A5568">Seat ${p.seat} — ${p.name || 'Passenger'}</div>`).join('')}
+  </div>` : ''}
+
+  <h2>Fare Breakdown</h2>
+  <table>
+    ${rows.join('')}
+    <tr class="total"><td>Total Amount</td><td class="r">₹${total}</td></tr>
+  </table>
+
+  <div class="foot">
+    Thank you for riding with UKCAAR.<br/>
+    This is a system-generated invoice and does not require a signature.
+  </div>
+</div></body></html>`;
+  }, [ticketRef, bookingId, ride, isBookingMode, pricePerSeat, seats, returnDeparture, scheduledRoute, total, dateLabel, statusLabel, depTime, durationMin, distanceKm, fromName, toName, passengers]);
+
+  const handleShareInvoice = () => {
+    const inv = ticketRef || (bookingId ? `UKC-${bookingId.slice(-8).toUpperCase()}` : '3UKCAAR1234');
+    const lines = [
+      `UKCAAR — Scheduled Trip Invoice ${inv}`,
+      `Date: ${dateLabel} (${depTime})`,
+      `Route: ${fromName} → ${toName}`,
+      `Status: ${statusLabel}`,
+      `Total: ₹${total}`,
+      '',
+      `Thank you for riding with UKCAAR!`,
+    ];
+    try {
+      Share.share({ message: lines.join('\n'), title: `Invoice ${inv}` });
+    } catch (_) {}
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoHome} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={s(24)} color={Colors.white} />
+        <TouchableOpacity
+          onPress={isFinished ? () => navigation.goBack() : handleGoHome}
+          style={styles.backBoxBtn}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chevron-back" size={20} color={Colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Summary</Text>
-        <View style={{ width: s(32) }} />
+        <View style={{ width: s(34) }} />
       </View>
 
       {loading ? (
@@ -225,210 +349,203 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* This screen is shown for a *pending* scheduled booking (not a
-            completed ride), so the copy here reflects "your trip will
-            start at …" rather than "thanks for riding". Once the driver
-            or admin completes the journey, the rider's Activity tab
-            will show it as completed. */}
-        <Text style={styles.heading}>
-          {isBookingMode ? 'Booking confirmed' : 'Trip details'}
-        </Text>
-        <Text style={styles.subheading}>
-          {isBookingMode
-            ? `Your trip starts at ${depTime} on ${dateLabel}.`
-            : `Departure ${depTime} • ${dateLabel}`}
-        </Text>
-
-        <View style={styles.ticket}>
-          <View style={styles.statusPill}>
-            <Ionicons name="time-outline" size={14} color={Colors.primary} />
-            <Text style={styles.statusPillText}>{statusLabel}</Text>
-          </View>
-
-          <Text style={styles.routeName} numberOfLines={1}>
-            {routeName}
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.topSubheading}>
+            {isFinished
+              ? 'Thanks for riding with  UKCAAR!'
+              : isBookingMode
+              ? `Your trip starts at ${depTime} on ${dateLabel}.`
+              : `Departure ${depTime} • ${dateLabel}`}
           </Text>
 
-          <View style={styles.divider} />
+          {/* Ticket Receipt Card */}
+          <View style={styles.receiptCard}>
+            {/* Trip ID Header */}
+            <Text style={styles.tripIdLabel}>Trip ID</Text>
+            <Text style={styles.tripIdValue}>
+              {ticketRef || (bookingId ? `UKC-${bookingId.slice(-8).toUpperCase()}` : '3UKCAAR1234')}
+            </Text>
 
-          <View style={styles.row}>
-            <Ionicons name="calendar-outline" size={18} color={Colors.textPrimary} />
-            <View style={styles.rowBody}>
-              <Text style={styles.rowLabel}>Departure</Text>
-              <Text style={styles.rowValue}>
-                {depTime}   {dateLabel}
+            <View style={styles.divider} />
+
+            {/* Date & Time */}
+            <View style={styles.fieldSection}>
+              <View style={styles.fieldHeader}>
+                <Ionicons name="calendar-outline" size={16} color="#718096" />
+                <Text style={styles.fieldLabel}>Date & Time</Text>
+              </View>
+              <Text style={styles.fieldValueBold}>{depTime}   {dateLabel}</Text>
+            </View>
+
+            {/* Route */}
+            <View style={styles.fieldSection}>
+              <View style={styles.fieldHeader}>
+                <Ionicons name="git-commit-outline" size={16} color="#0097B3" />
+                <Text style={styles.fieldLabel}>Route</Text>
+              </View>
+              <Text style={styles.fieldValueBold}>{fromName}</Text>
+              <View style={styles.routeConnectorLine} />
+              <View style={styles.stopRow}>
+                <Ionicons name="location-outline" size={16} color="#718096" style={{ marginRight: 6 }} />
+                <Text style={styles.fieldValueBold}>{toName}</Text>
+              </View>
+            </View>
+
+            {/* Duration Distance */}
+            <View style={styles.fieldSection}>
+              <View style={styles.fieldHeader}>
+                <Ionicons name="time-outline" size={16} color="#718096" />
+                <Text style={styles.fieldLabel}>Duration Distance</Text>
+              </View>
+              <Text style={styles.fieldValueBold}>
+                {durationMin > 0 ? `${durationMin}min` : '50min'}  |  {distanceKm > 0 ? `${distanceKm.toFixed(1)} km` : '4.3 km'}
               </Text>
             </View>
-          </View>
 
-          <View style={[styles.row, { marginTop: 14 }]}>
-            <Ionicons name="location-outline" size={18} color={Colors.primary} />
-            <View style={styles.rowBody}>
-              <Text style={styles.rowLabel}>From</Text>
-              <Text style={styles.rowValue}>{fromName}</Text>
-            </View>
-          </View>
-          <View style={styles.routeLine} />
-          <View style={styles.row}>
-            <Ionicons name="location-outline" size={18} color={Colors.textMuted} />
-            <View style={styles.rowBody}>
-              <Text style={styles.rowLabel}>To</Text>
-              <Text style={styles.rowValue}>{toName}</Text>
-            </View>
-          </View>
+            <View style={styles.divider} />
 
-          {seats.length > 0 && (
-            <View style={[styles.row, { marginTop: 14 }]}>
-              <Ionicons name="person-outline" size={18} color={Colors.textPrimary} />
-              <View style={styles.rowBody}>
-                <Text style={styles.rowLabel}>Seats</Text>
-                <Text style={styles.rowValue}>
-                  {seatLabel} ({seats.length} seat{seats.length === 1 ? '' : 's'})
-                </Text>
+            {/* Fare Breakdown */}
+            <View style={styles.fieldSection}>
+              <View style={styles.fieldHeader}>
+                <Ionicons name="receipt-outline" size={18} color="#4A5568" />
+                <Text style={styles.fareTitle}>Fare Breakdown</Text>
               </View>
-            </View>
-          )}
 
-          {durationMin > 0 && (
-            <View style={[styles.row, { marginTop: 14 }]}>
-              <Ionicons name="time-outline" size={18} color={Colors.textPrimary} />
-              <View style={styles.rowBody}>
-                <Text style={styles.rowLabel}>Duration • Distance</Text>
-                <Text style={styles.rowValue}>
-                  {durationMin} min
-                  {distanceKm > 0 ? `  •  ${distanceKm.toFixed(1)} km` : ''}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Passengers — one row per booked seat, with the name (and contact
-              if provided) captured during the booking flow. */}
-          {passengers.length > 0 && (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.row}>
-                <Ionicons name="people-outline" size={18} color={Colors.textPrimary} />
-                <Text style={[styles.rowValue, { marginLeft: 8, fontSize: 16 }]}>
-                  Passenger{passengers.length === 1 ? '' : 's'}
-                </Text>
-              </View>
-              {passengers.map((p) => (
-                <View key={p.seat} style={styles.paxRow}>
-                  <View style={styles.paxSeatBadge}>
-                    <Text style={styles.paxSeatText}>{p.seat}</Text>
-                  </View>
-                  <View style={styles.paxBody}>
-                    <Text style={styles.paxName} numberOfLines={1}>
-                      {p.name?.trim() || 'Passenger'}
+              {isBookingMode && pricePerSeat > 0 ? (
+                <>
+                  <View style={styles.fareRow}>
+                    <Text style={styles.fareItemLabel}>
+                      Ticket Price ({seats.length} × ₹{pricePerSeat})
                     </Text>
-                    {!!p.contact?.trim() && (
-                      <Text style={styles.paxContact} numberOfLines={1}>
-                        {p.contact}
-                      </Text>
-                    )}
+                    <Text style={styles.fareItemValue}>₹{seats.length * pricePerSeat}</Text>
                   </View>
-                </View>
-              ))}
-            </>
-          )}
-
-          {returnDeparture && (
-            <View style={styles.returnLegBlock}>
-              <View style={styles.returnLegHeader}>
-                <Ionicons name="repeat" size={16} color={Colors.primary} />
-                <Text style={styles.returnLegTitle}>Return leg</Text>
-              </View>
-              <Text style={styles.returnLegTime}>{returnDeparture.time}</Text>
-            </View>
-          )}
-
-          <View style={styles.divider} />
-
-          <View style={styles.row}>
-            <Ionicons name="card-outline" size={18} color={Colors.textPrimary} />
-            <Text style={[styles.rowValue, { marginLeft: 8, fontSize: 16 }]}>
-              Fare Breakdown
-            </Text>
-          </View>
-
-          {isBookingMode && pricePerSeat > 0 ? (
-            <>
-              <View style={styles.fareRow}>
-                <Text style={styles.fareLabel}>
-                  Ticket Price ({seats.length} × ₹{pricePerSeat})
-                </Text>
-                <Text style={styles.fareValue}>₹{seats.length * pricePerSeat}</Text>
-              </View>
-
-              {returnDeparture && (
-                <View style={styles.fareRow}>
-                  <Text style={styles.fareLabel}>
-                    Return leg ({seats.length} × ₹{pricePerSeat})
-                  </Text>
-                  <Text style={styles.fareValue}>₹{seats.length * pricePerSeat}</Text>
-                </View>
+                  {returnDeparture && (
+                    <View style={styles.fareRow}>
+                      <Text style={styles.fareItemLabel}>
+                        Return leg ({seats.length} × ₹{pricePerSeat})
+                      </Text>
+                      <Text style={styles.fareItemValue}>₹{seats.length * pricePerSeat}</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <>
+                  <View style={styles.fareRow}>
+                    <Text style={styles.fareItemLabel}>Base Fare</Text>
+                    <Text style={styles.fareItemValue}>₹{scheduledRoute?.price ?? total}</Text>
+                  </View>
+                  {total > (scheduledRoute?.price ?? total) && (
+                    <View style={styles.fareRow}>
+                      <Text style={styles.fareItemLabel}>Distance Charge</Text>
+                      <Text style={styles.fareItemValue}>₹{total - (scheduledRoute?.price ?? total)}</Text>
+                    </View>
+                  )}
+                </>
               )}
-            </>
-          ) : (
-            <View style={styles.fareRow}>
-              <Text style={styles.fareLabel}>Fare</Text>
-              <Text style={styles.fareValue}>₹{total}</Text>
             </View>
-          )}
 
-          <View style={styles.divider} />
+            <View style={styles.divider} />
 
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Paid</Text>
-            <Text style={styles.totalValue}>₹{total}</Text>
-          </View>
-
-          {/* Boarding QR — scanned by the driver/conductor to verify the
-              ticket. Encodes the trip essentials + a reference code. */}
-          <View style={styles.divider} />
-          <View style={styles.qrSection}>
-            <View style={styles.qrCard}>
-              <SafeQR value={qrData} size={150} />
+            {/* Total Amount & Payment Method */}
+            <View style={styles.totalBlock}>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalTitle}>Total Amount</Text>
+                <Text style={styles.totalValueBold}>₹{total}</Text>
+              </View>
+              <Text style={styles.paymentMethodLabel}>
+                Payment Method : {(ride?.paymentMethod || 'UPI').toString().toUpperCase()}
+              </Text>
             </View>
-            <Text style={styles.qrRef}>{ticketRef}</Text>
-            <Text style={styles.qrHint}>Show this QR code at boarding</Text>
+
+            {/* Boarding QR — only if trip is active / upcoming */}
+            {!isFinished && (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.qrSection}>
+                  <View style={styles.qrCard}>
+                    <SafeQR value={qrData} size={150} />
+                  </View>
+                  <Text style={styles.qrRef}>{ticketRef}</Text>
+                  <Text style={styles.qrHint}>Show this QR code at boarding</Text>
+                </View>
+              </>
+            )}
+
+            {/* Decorative tear edge */}
+            <View style={styles.tearRow}>
+              {Array.from({ length: 18 }).map((_, i) => (
+                <View key={i} style={styles.tearDot} />
+              ))}
+            </View>
           </View>
 
-          {/* Decorative tear edge to keep the existing ticket look. */}
-          <View style={styles.tearRow}>
-            {Array.from({ length: 18 }).map((_, i) => (
-              <View key={i} style={styles.tearDot} />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.tipBanner}>
-          <Ionicons name="information-circle-outline" size={18} color={Colors.primary} />
-          <Text style={styles.tipText}>
-            We'll remind you 30 minutes before departure. You can revisit
-            this booking any time from the Activity tab.
-          </Text>
-        </View>
-      </ScrollView>
+          {/* Get PDF Receipt Button right below ticket */}
+          <TouchableOpacity
+            style={styles.pdfButton}
+            activeOpacity={0.75}
+            onPress={() => setInvoiceOpen(true)}
+          >
+            <Ionicons name="download-outline" size={20} color="#4A5568" />
+            <Text style={styles.pdfText}>Get PDF Receipt</Text>
+          </TouchableOpacity>
+        </ScrollView>
       )}
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.cta} onPress={handleGoHome} activeOpacity={0.85}>
-          <Ionicons name="home-outline" size={18} color={Colors.white} />
-          <Text style={styles.ctaText}>Go to Home</Text>
+      {/* Bottom Footer */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        <TouchableOpacity
+          style={styles.cta}
+          onPress={isFinished ? () => navigation.navigate('SelectRide') : handleGoHome}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.ctaText}>{isFinished ? 'Book Again' : 'Go to Home'}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Invoice preview modal */}
+      <Modal
+        visible={invoiceOpen}
+        animationType="slide"
+        onRequestClose={() => setInvoiceOpen(false)}
+      >
+        <View style={styles.modalContainer}>
+          <StatusBar translucent backgroundColor="#0097B3" barStyle="light-content" />
+          <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+            <TouchableOpacity
+              onPress={() => setInvoiceOpen(false)}
+              style={styles.backBoxBtn}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Invoice</Text>
+            <TouchableOpacity
+              onPress={handleShareInvoice}
+              style={styles.backBoxBtn}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+          <WebView
+            originWhitelist={['*']}
+            source={{ html: invoiceHtml }}
+            style={{ flex: 1, backgroundColor: '#FFFFFF' }}
+            javaScriptEnabled={false}
+            scalesPageToFit={Platform.OS === 'android'}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundCard },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  modalContainer: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -437,7 +554,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(16),
     paddingVertical: vs(14),
   },
-  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  backBoxBtn: {
+    width: s(34),
+    height: s(34),
+    borderRadius: s(8),
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(18),
@@ -446,181 +571,180 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  content: { padding: s(16), paddingBottom: vs(120) },
+  content: { paddingHorizontal: s(20), paddingBottom: vs(120) },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  heading: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(20),
-    color: Colors.textPrimary,
+  topSubheading: {
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(15),
+    color: '#4A5568',
     textAlign: 'center',
-    marginTop: vs(6),
-  },
-  subheading: {
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(14),
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: vs(4),
-    marginBottom: vs(22),
+    marginTop: vs(16),
+    marginBottom: vs(18),
   },
 
-  ticket: {
+  receiptCard: {
     backgroundColor: Colors.white,
-    borderRadius: s(18),
-    padding: s(22),
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    ...Shadow.sm,
+    borderRadius: s(24),
+    paddingTop: vs(24),
+    paddingHorizontal: s(22),
+    paddingBottom: vs(20),
+    ...Shadow.md,
+    overflow: 'hidden',
   },
-  statusPill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: s(6),
-    paddingHorizontal: s(10),
-    paddingVertical: vs(6),
-    backgroundColor: alpha(Colors.primary, 0.1),
-    borderRadius: 999,
-  },
-  statusPillText: {
-    fontFamily: 'Inter-SemiBold',
+
+  tripIdLabel: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(12),
-    color: Colors.primary,
+    color: '#718096',
+    textAlign: 'center',
   },
-  routeName: {
-    fontFamily: 'Inter-SemiBold',
+  tripIdValue: {
+    fontFamily: 'Inter-Bold',
     fontSize: fs(22),
-    color: Colors.textPrimary,
-    marginTop: vs(12),
+    color: '#2D3748',
+    textAlign: 'center',
+    marginTop: vs(4),
+    letterSpacing: 0.5,
   },
 
   divider: {
     height: 1,
-    backgroundColor: Colors.borderLight,
-    marginVertical: vs(14),
+    backgroundColor: '#E2E8F0',
+    marginVertical: vs(16),
   },
 
-  row: { flexDirection: 'row', alignItems: 'flex-start' },
-  rowBody: { marginLeft: s(8), flex: 1 },
-  rowLabel: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: Colors.textMuted },
-  rowValue: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(15),
-    color: Colors.textPrimary,
-    marginTop: vs(2),
+  fieldSection: {
+    marginBottom: vs(16),
   },
-  routeLine: {
-    width: 1.5,
-    height: vs(14),
-    backgroundColor: Colors.border,
-    marginLeft: s(8),
-    marginVertical: vs(4),
-  },
-
-  // Passengers
-  paxRow: {
+  fieldHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: vs(12),
+    gap: s(6),
   },
-  paxSeatBadge: {
-    width: s(34),
-    height: s(34),
-    borderRadius: s(8),
-    backgroundColor: alpha(Colors.primary, 0.1),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  paxSeatText: {
-    fontFamily: 'Inter-SemiBold',
+  fieldLabel: {
+    fontFamily: 'Inter-Regular',
     fontSize: fs(13),
-    color: Colors.primary,
+    color: '#718096',
   },
-  paxBody: { marginLeft: s(12), flex: 1 },
-  paxName: {
+  fieldValueBold: {
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(15),
-    color: Colors.textPrimary,
+    color: '#2D3748',
+    marginTop: vs(4),
+    marginLeft: s(22),
   },
-  paxContact: {
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(12),
-    color: Colors.textMuted,
-    marginTop: 1,
+  routeConnectorLine: {
+    width: 2,
+    height: vs(16),
+    backgroundColor: '#CBD5E0',
+    marginLeft: s(28),
+    marginVertical: vs(4),
   },
-
-  // QR
-  qrSection: { alignItems: 'center', marginTop: vs(4) },
-  qrCard: {
-    padding: s(12),
-    backgroundColor: Colors.white,
-    borderRadius: s(12),
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  qrRef: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(14),
-    letterSpacing: 1,
-    color: Colors.textPrimary,
-    marginTop: vs(12),
-  },
-  qrHint: {
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(12),
-    color: Colors.textMuted,
+  stopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: s(22),
     marginTop: vs(2),
   },
 
+  fareTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(15),
+    color: '#2D3748',
+  },
   fareRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: vs(8),
+    marginTop: vs(10),
+    paddingLeft: s(2),
   },
-  fareLabel: { fontFamily: 'Inter-Regular', fontSize: fs(13), color: Colors.textSecondary },
-  fareValue: { fontFamily: 'Inter-SemiBold', fontSize: fs(13), color: Colors.textPrimary },
+  fareItemLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(13),
+    color: '#4A5568',
+  },
+  fareItemValue: {
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14),
+    color: '#2D3748',
+  },
 
+  totalBlock: {
+    marginTop: vs(2),
+  },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  totalLabel: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.textPrimary },
-  totalValue: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: Colors.textPrimary },
+  totalTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(16),
+    color: '#2D3748',
+  },
+  totalValueBold: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(18),
+    color: '#2D3748',
+  },
+  paymentMethodLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: '#718096',
+    marginTop: vs(6),
+  },
+
+  qrSection: { alignItems: 'center', marginTop: vs(8) },
+  qrCard: {
+    padding: s(12),
+    backgroundColor: Colors.white,
+    borderRadius: s(12),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  qrRef: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(14),
+    letterSpacing: 1,
+    color: '#2D3748',
+    marginTop: vs(12),
+  },
+  qrHint: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: '#718096',
+    marginTop: vs(2),
+  },
 
   tearRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: vs(14),
+    marginTop: vs(20),
     marginHorizontal: -s(22),
-    paddingHorizontal: s(8),
+    marginBottom: -vs(25),
+    paddingHorizontal: s(6),
   },
   tearDot: {
-    width: s(10),
-    height: s(10),
-    borderRadius: s(5),
-    backgroundColor: Colors.backgroundCard,
-    marginBottom: -s(5),
+    width: s(12),
+    height: s(12),
+    borderRadius: s(6),
+    backgroundColor: '#F8FAFC',
   },
 
-  tipBanner: {
+  pdfButton: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: s(8),
-    backgroundColor: alpha(Colors.primary, 0.06),
-    borderRadius: s(12),
+    marginTop: vs(32),
     paddingVertical: vs(12),
-    paddingHorizontal: s(14),
-    marginTop: vs(18),
   },
-  tipText: {
-    flex: 1,
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(12),
-    lineHeight: fs(18),
-    color: Colors.textSecondary,
+  pdfText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14),
+    color: '#4A5568',
   },
 
   footer: {
@@ -633,40 +757,15 @@ const styles = StyleSheet.create({
     ...Shadow.top,
   },
   cta: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: s(8),
     backgroundColor: Colors.primary,
-    borderRadius: s(8),
-    height: vs(56),
+    borderRadius: s(10),
+    height: vs(52),
   },
   ctaText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(16),
     color: Colors.white,
-  },
-
-  returnLegBlock: {
-    marginTop: vs(12),
-    paddingTop: vs(12),
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-  },
-  returnLegHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: s(6),
-    marginBottom: vs(4),
-  },
-  returnLegTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(14),
-    color: Colors.primary,
-  },
-  returnLegTime: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(18),
-    color: Colors.textPrimary,
   },
 });

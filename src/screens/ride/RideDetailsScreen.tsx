@@ -250,13 +250,13 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
   if (loading) {
     return (
       <View style={styles.container}>
-        <StatusBar translucent backgroundColor="#0097B3" barStyle="light-content" />
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBoxBtn}>
+            <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Ride Details</Text>
-          <View style={styles.backBtn} />
+          <Text style={styles.headerTitle}>Trip Summary</Text>
+          <View style={{ width: s(34) }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0097B3" />
@@ -271,163 +271,157 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="#0097B3" barStyle="light-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.backBoxBtn}
+          activeOpacity={0.8}
         >
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ride Details</Text>
-        <View style={styles.backBtn} />
+        <Text style={styles.headerTitle}>Trip Summary</Text>
+        <View style={{ width: s(34) }} />
       </View>
 
       <ScrollView
-        style={styles.list}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Summary card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.dateText}>
-                {formatDateTime(ride.completedAt || ride.createdAt)}
-              </Text>
-              <View style={[styles.statusPill, { backgroundColor: 'rgba(0,200,150,0.1)' }]}>
-                <View style={[styles.statusDot, { backgroundColor: '#00C896' }]} />
-                <Text style={[styles.statusText, { color: '#00C896' }]}>Completed</Text>
-              </View>
+        <Text style={styles.topSubheading}>Thanks for riding with  UKCAAR!</Text>
+
+        {/* Ticket Receipt Card */}
+        <View style={styles.receiptCard}>
+          {/* Trip ID Header */}
+          <Text style={styles.tripIdLabel}>Trip ID</Text>
+          <Text style={styles.tripIdValue}>{inv || shortInvoiceId(ride._id || '1234')}</Text>
+
+          <View style={styles.divider} />
+
+          {/* Date & Time */}
+          <View style={styles.fieldSection}>
+            <View style={styles.fieldHeader}>
+              <Ionicons name="calendar-outline" size={16} color="#718096" />
+              <Text style={styles.fieldLabel}>Date & Time</Text>
             </View>
-            <View style={styles.typeChip}>
-              <Text style={styles.typeChipText}>
-                {(ride.rideType || 'economy').toString().toUpperCase()}
-              </Text>
+            <Text style={styles.fieldValueBold}>
+              {formatDateTime(ride.completedAt || ride.createdAt)}
+            </Text>
+          </View>
+
+          {/* Route */}
+          <View style={styles.fieldSection}>
+            <View style={styles.fieldHeader}>
+              <Ionicons name="git-commit-outline" size={16} color="#0097B3" />
+              <Text style={styles.fieldLabel}>Route</Text>
+            </View>
+            <Text style={styles.fieldValueBold}>{ride.pickup?.address || 'Pickup'}</Text>
+            <View style={styles.routeConnectorLine} />
+            <View style={styles.stopRow}>
+              <Ionicons name="location-outline" size={16} color="#718096" style={{ marginRight: 6 }} />
+              <Text style={styles.fieldValueBold}>{ride.dropoff?.address || 'Drop-off'}</Text>
             </View>
           </View>
 
-          <View style={styles.invoiceIdRow}>
-            <Text style={styles.invoiceIdLabel}>Invoice</Text>
-            <Text style={styles.invoiceIdValue}>{inv}</Text>
+          {/* Duration Distance */}
+          <View style={styles.fieldSection}>
+            <View style={styles.fieldHeader}>
+              <Ionicons name="time-outline" size={16} color="#718096" />
+              <Text style={styles.fieldLabel}>Duration Distance</Text>
+            </View>
+            <Text style={styles.fieldValueBold}>
+              {Math.round(breakdown.tripDuration)}min  |  {breakdown.tripDistance.toFixed(1)} km
+            </Text>
           </View>
 
-          {/* Locations */}
-          <View style={styles.locations}>
-            <View style={styles.locationRow}>
-              <View style={styles.pickupDot} />
-              <View style={styles.locationTexts}>
-                <Text style={styles.locationLabel}>Pickup</Text>
-                <Text style={styles.locationValue}>{ride.pickup?.address || '—'}</Text>
-              </View>
+          <View style={styles.divider} />
+
+          {/* Fare Breakdown */}
+          <View style={styles.fieldSection}>
+            <View style={styles.fieldHeader}>
+              <Ionicons name="receipt-outline" size={18} color="#4A5568" />
+              <Text style={styles.fareTitle}>Fare Breakdown</Text>
             </View>
-            <View style={styles.connector} />
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={14} color="#EF4444" style={styles.dropoffIcon} />
-              <View style={styles.locationTexts}>
-                <Text style={styles.locationLabel}>Drop-off</Text>
-                <Text style={styles.locationValue}>{ride.dropoff?.address || '—'}</Text>
-              </View>
+            <View style={styles.fareRow}>
+              <Text style={styles.fareItemLabel}>Base Fare</Text>
+              <Text style={styles.fareItemValue}>₹{breakdown.baseFare.toFixed(0)}</Text>
             </View>
+            {breakdown.distanceCharge > 0 && (
+              <View style={styles.fareRow}>
+                <Text style={styles.fareItemLabel}>Distance Charge</Text>
+                <Text style={styles.fareItemValue}>₹{breakdown.distanceCharge.toFixed(0)}</Text>
+              </View>
+            )}
+            {breakdown.timeCharge > 0 && (
+              <View style={styles.fareRow}>
+                <Text style={styles.fareItemLabel}>Time Charge</Text>
+                <Text style={styles.fareItemValue}>₹{breakdown.timeCharge.toFixed(0)}</Text>
+              </View>
+            )}
+            {breakdown.surgeCharge > 0 && (
+              <View style={styles.fareRow}>
+                <Text style={styles.fareItemLabel}>Surge Charge</Text>
+                <Text style={styles.fareItemValue}>₹{breakdown.surgeCharge.toFixed(0)}</Text>
+              </View>
+            )}
+            {breakdown.tip > 0 && (
+              <View style={styles.fareRow}>
+                <Text style={styles.fareItemLabel}>Tip</Text>
+                <Text style={styles.fareItemValue}>₹{breakdown.tip.toFixed(0)}</Text>
+              </View>
+            )}
+            {breakdown.discount > 0 && (
+              <View style={styles.fareRow}>
+                <Text style={[styles.fareItemLabel, { color: '#15803D' }]}>Discount</Text>
+                <Text style={[styles.fareItemValue, { color: '#15803D' }]}>-₹{breakdown.discount.toFixed(0)}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Total Amount & Payment Method */}
+          <View style={styles.totalBlock}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalTitle}>Total Amount</Text>
+              <Text style={styles.totalValueBold}>₹{breakdown.totalFare.toFixed(0)}</Text>
+            </View>
+            <Text style={styles.paymentMethodLabel}>
+              Payment Method : {(ride.paymentMethod || 'UPI').toString().toUpperCase()}
+            </Text>
+          </View>
+
+          {/* Decorative tear edge */}
+          <View style={styles.tearRow}>
+            {Array.from({ length: 18 }).map((_, i) => (
+              <View key={i} style={styles.tearDot} />
+            ))}
           </View>
         </View>
 
-        {/* Trip metrics */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Trip Summary</Text>
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Distance</Text>
-              <Text style={styles.metricValue}>{breakdown.tripDistance.toFixed(1)} km</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Duration</Text>
-              <Text style={styles.metricValue}>{Math.round(breakdown.tripDuration)} min</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Payment</Text>
-              <Text style={styles.metricValue}>
-                {(ride.paymentMethod || 'cash').toString().toUpperCase()}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Fare breakdown */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Fare Breakdown</Text>
-          <View style={styles.chargeRow}>
-            <Text style={styles.chargeLabel}>Base Fare</Text>
-            <Text style={styles.chargeValue}>₹{breakdown.baseFare.toFixed(2)}</Text>
-          </View>
-          {breakdown.distanceCharge > 0 && (
-            <View style={[styles.chargeRow, { marginTop: 10 }]}>
-              <Text style={styles.chargeLabel}>Distance Charge</Text>
-              <Text style={styles.chargeValue}>₹{breakdown.distanceCharge.toFixed(2)}</Text>
-            </View>
-          )}
-          {breakdown.timeCharge > 0 && (
-            <View style={[styles.chargeRow, { marginTop: 10 }]}>
-              <Text style={styles.chargeLabel}>Time Charge</Text>
-              <Text style={styles.chargeValue}>₹{breakdown.timeCharge.toFixed(2)}</Text>
-            </View>
-          )}
-          {breakdown.surgeCharge > 0 && (
-            <View style={[styles.chargeRow, { marginTop: 10 }]}>
-              <Text style={[styles.chargeLabel, { color: '#FF6B00' }]}>Surge</Text>
-              <Text style={[styles.chargeValue, { color: '#FF6B00' }]}>
-                ₹{breakdown.surgeCharge.toFixed(2)}
-              </Text>
-            </View>
-          )}
-          {breakdown.tip > 0 && (
-            <View style={[styles.chargeRow, { marginTop: 10 }]}>
-              <Text style={styles.chargeLabel}>Tip</Text>
-              <Text style={styles.chargeValue}>₹{breakdown.tip.toFixed(2)}</Text>
-            </View>
-          )}
-          {breakdown.discount > 0 && (
-            <View style={[styles.chargeRow, { marginTop: 10 }]}>
-              <Text style={[styles.chargeLabel, { color: '#15803D' }]}>Discount</Text>
-              <Text style={[styles.chargeValue, { color: '#15803D' }]}>
-                -₹{breakdown.discount.toFixed(2)}
-              </Text>
-            </View>
-          )}
-          <View style={styles.totalDivider} />
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Paid</Text>
-            <Text style={styles.totalValue}>₹{breakdown.totalFare.toFixed(2)}</Text>
-          </View>
-        </View>
-
-        {/* Invoice actions */}
+        {/* Get PDF Receipt button */}
         <TouchableOpacity
-          style={styles.primaryBtn}
-          activeOpacity={0.85}
+          style={styles.pdfButton}
+          activeOpacity={0.75}
           onPress={() => setInvoiceOpen(true)}
         >
-          <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
-          <Text style={styles.primaryBtnText}>View Invoice</Text>
+          <Ionicons name="download-outline" size={20} color="#4A5568" />
+          <Text style={styles.pdfText}>Get PDF Receipt</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          activeOpacity={0.85}
-          onPress={handleShareInvoice}
-        >
-          <Ionicons name="share-social-outline" size={20} color="#0097B3" />
-          <Text style={styles.secondaryBtnText}>Share / Download Invoice</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.privacyNote}>
-          Driver details are hidden for privacy after a ride is completed.
-        </Text>
       </ScrollView>
+
+      {/* Bottom Footer */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        <TouchableOpacity
+          style={styles.cta}
+          onPress={() => navigation.navigate('SelectRide')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.ctaText}>Book Again</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Invoice preview modal */}
       <Modal
@@ -435,23 +429,23 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
         animationType="slide"
         onRequestClose={() => setInvoiceOpen(false)}
       >
-        <View style={styles.container}>
+        <View style={styles.modalContainer}>
           <StatusBar translucent backgroundColor="#0097B3" barStyle="light-content" />
           <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
             <TouchableOpacity
               onPress={() => setInvoiceOpen(false)}
-              style={styles.backBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.backBoxBtn}
+              activeOpacity={0.8}
             >
-              <Ionicons name="close" size={24} color="#FFFFFF" />
+              <Ionicons name="close" size={20} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Invoice</Text>
             <TouchableOpacity
               onPress={handleShareInvoice}
-              style={styles.backBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.backBoxBtn}
+              activeOpacity={0.8}
             >
-              <Ionicons name="share-social-outline" size={22} color="#FFFFFF" />
+              <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
           <WebView
@@ -459,7 +453,6 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
             source={{ html: invoiceHtml }}
             style={{ flex: 1, backgroundColor: '#FFFFFF' }}
             javaScriptEnabled={false}
-            // Allow user to scroll, zoom (pinch) the invoice
             scalesPageToFit={Platform.OS === 'android'}
           />
         </View>
@@ -469,225 +462,213 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  modalContainer: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
-    backgroundColor: Colors.primary,
-    paddingBottom: vs(16),
-    paddingHorizontal: s(12),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: s(16),
+    paddingVertical: vs(14),
   },
-  backBtn: { width: s(40), height: s(40), alignItems: 'center', justifyContent: 'center' },
+  backBoxBtn: {
+    width: s(34),
+    height: s(34),
+    borderRadius: s(8),
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(18),
-    lineHeight: fs(28),
     color: Colors.white,
+    flex: 1,
+    textAlign: 'center',
   },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { flex: 1 },
-  listContent: { padding: s(16), gap: s(16) },
 
-  card: {
+  content: { paddingHorizontal: s(20) },
+  topSubheading: {
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(15),
+    color: '#4A5568',
+    textAlign: 'center',
+    marginTop: vs(16),
+    marginBottom: vs(18),
+  },
+
+  receiptCard: {
     backgroundColor: Colors.white,
-    borderRadius: s(16),
-    padding: s(16),
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
+    borderRadius: s(24),
+    paddingTop: vs(24),
+    paddingHorizontal: s(22),
+    paddingBottom: vs(20),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-    marginBottom: vs(16),
+    shadowRadius: 10,
+    elevation: 4,
+    overflow: 'hidden',
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: vs(12),
-  },
-  dateText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: fs(16),
-    lineHeight: fs(24),
-    color: '#101828',
-    marginBottom: vs(8),
-  },
-  statusPill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: s(12),
-    paddingVertical: vs(4),
-    borderRadius: s(999),
-  },
-  statusDot: { width: s(8), height: s(8), borderRadius: s(4), marginRight: s(8) },
-  statusText: { fontFamily: 'Inter-Medium', fontSize: fs(14), lineHeight: fs(20) },
-  typeChip: {
-    paddingHorizontal: s(12),
-    paddingVertical: vs(4),
-    borderRadius: s(10),
-    backgroundColor: '#EFF6FF',
-    marginLeft: s(8),
-  },
-  typeChipText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: fs(13),
-    lineHeight: fs(20),
-    color: '#155DFC',
-  },
-  invoiceIdRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: vs(10),
-    paddingHorizontal: s(12),
-    backgroundColor: '#F8F9FB',
-    borderRadius: s(10),
-    marginBottom: vs(14),
-  },
-  invoiceIdLabel: {
+
+  tripIdLabel: {
     fontFamily: 'Inter-Regular',
-    fontSize: fs(13),
-    color: '#6A7282',
+    fontSize: fs(12),
+    color: '#718096',
+    textAlign: 'center',
   },
-  invoiceIdValue: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(14),
-    color: '#101828',
+  tripIdValue: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(22),
+    color: '#2D3748',
+    textAlign: 'center',
+    marginTop: vs(4),
     letterSpacing: 0.5,
   },
-  locations: { marginTop: vs(4) },
-  locationRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  pickupDot: {
-    width: s(12),
-    height: s(12),
-    borderRadius: s(6),
-    backgroundColor: '#219EBC',
-    marginTop: vs(5),
-    marginRight: s(12),
-  },
-  dropoffIcon: { marginRight: s(11), marginTop: vs(3), marginLeft: s(-1) },
-  locationTexts: { flex: 1 },
-  locationLabel: {
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(12),
-    lineHeight: fs(16),
-    color: '#6A7282',
-  },
-  locationValue: {
-    fontFamily: 'Inter-Medium',
-    fontSize: fs(15),
-    lineHeight: fs(22),
-    color: '#101828',
-  },
-  connector: {
-    width: s(2),
-    height: vs(16),
-    backgroundColor: '#E5E7EB',
-    marginLeft: s(5),
-    marginVertical: vs(4),
+
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: vs(16),
   },
 
-  sectionTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(16),
-    color: '#101828',
-    marginBottom: vs(14),
+  fieldSection: {
+    marginBottom: vs(16),
   },
-  metricsRow: {
+  fieldHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: s(6),
   },
-  metricCell: { flex: 1, alignItems: 'center' },
-  metricDivider: { width: 1, height: vs(36), backgroundColor: '#E5E7EB' },
-  metricLabel: {
+  fieldLabel: {
     fontFamily: 'Inter-Regular',
-    fontSize: fs(12),
-    color: '#6A7282',
-    marginBottom: vs(4),
+    fontSize: fs(13),
+    color: '#718096',
   },
-  metricValue: {
+  fieldValueBold: {
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(15),
-    color: '#101828',
+    color: '#2D3748',
+    marginTop: vs(4),
+    marginLeft: s(22),
+  },
+  routeConnectorLine: {
+    width: 2,
+    height: vs(16),
+    backgroundColor: '#CBD5E0',
+    marginLeft: s(28),
+    marginVertical: vs(4),
+  },
+  stopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: s(22),
+    marginTop: vs(2),
   },
 
-  chargeRow: {
+  fareTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(15),
+    color: '#2D3748',
+  },
+  fareRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: vs(10),
+    paddingLeft: s(2),
   },
-  chargeLabel: {
+  fareItemLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(13),
+    color: '#4A5568',
+  },
+  fareItemValue: {
     fontFamily: 'Inter-Medium',
-    fontSize: fs(15),
-    color: '#45474A',
+    fontSize: fs(14),
+    color: '#2D3748',
   },
-  chargeValue: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(15),
-    color: '#45474A',
-  },
-  totalDivider: {
-    height: 1,
-    backgroundColor: '#E5E5E5',
-    marginTop: vs(16),
-    marginBottom: vs(12),
+
+  totalBlock: {
+    marginTop: vs(2),
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  totalLabel: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(18),
-    color: '#101828',
-  },
-  totalValue: {
+  totalTitle: {
     fontFamily: 'Inter-Bold',
-    fontSize: fs(20),
-    color: Colors.primary,
+    fontSize: fs(16),
+    color: '#2D3748',
+  },
+  totalValueBold: {
+    fontFamily: 'Inter-Bold',
+    fontSize: fs(18),
+    color: '#2D3748',
+  },
+  paymentMethodLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: '#718096',
+    marginTop: vs(6),
   },
 
-  primaryBtn: {
-    height: vs(54),
-    borderRadius: s(12),
-    backgroundColor: Colors.primary,
+  tearRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: vs(20),
+    marginHorizontal: -s(22),
+    marginBottom: -vs(25),
+    paddingHorizontal: s(6),
+  },
+  tearDot: {
+    width: s(12),
+    height: s(12),
+    borderRadius: s(6),
+    backgroundColor: '#F8FAFC',
+  },
+
+  pdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: s(8),
+    marginTop: vs(32),
+    paddingVertical: vs(12),
   },
-  primaryBtnText: {
+  pdfText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14),
+    color: '#4A5568',
+  },
+
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: s(16),
+    backgroundColor: Colors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  cta: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: s(10),
+    height: vs(52),
+  },
+  ctaText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(16),
     color: Colors.white,
-  },
-  secondaryBtn: {
-    height: vs(54),
-    borderRadius: s(12),
-    borderWidth: 1.4,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: s(8),
-    marginTop: vs(12),
-  },
-  secondaryBtnText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: fs(16),
-    color: Colors.primary,
-  },
-  privacyNote: {
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(12),
-    color: '#6A7282',
-    textAlign: 'center',
-    marginTop: vs(16),
-    paddingHorizontal: s(8),
-    lineHeight: fs(18),
   },
 });

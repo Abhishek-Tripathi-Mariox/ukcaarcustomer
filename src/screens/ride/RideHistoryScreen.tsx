@@ -193,51 +193,53 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
     }
   };
 
+  const navigateToScheduledDetails = (ride: Ride) => {
+    const isFinished = ride.status === 'completed' || ride.status === 'cancelled';
+    const targetScreen = isFinished ? 'ScheduledTripSummary' : 'ScheduledBookingDetails';
+    const booking = (ride as any).booking ?? {};
+    navigation.navigate(targetScreen, {
+      route: {
+        id: booking.route || (ride as any).route || ride._id,
+        name: booking.routeName ?? (ride as any).routeName ?? 'Scheduled trip',
+        from: ride.pickup?.address ?? '—',
+        to: ride.dropoff?.address ?? '—',
+        capacity: 0,
+        price: Math.round(
+          (ride.actualFare ?? ride.estimatedFare ?? 0) /
+            Math.max(1, (booking.seats ?? []).length),
+        ),
+        nextDeparture: booking.departureTime ?? '',
+        approvedDriverCount: 0,
+        hasRoundTripDriver: false,
+        durationMin: 0,
+        bookedSeats: 0,
+      },
+      boarding: {
+        id: 'b',
+        name: ride.pickup?.address ?? '—',
+        time: booking.departureTime ?? '',
+      },
+      dropping: {
+        id: 'd',
+        name: ride.dropoff?.address ?? '—',
+        time: booking.departureTime ?? '',
+      },
+      seats: booking.seats ?? [],
+      passengers: booking.passengers ?? [],
+      total: ride.actualFare ?? ride.estimatedFare ?? 0,
+      departureDate: booking.departureDate,
+      departureIndex: booking.departureIndex,
+      bookingId: booking.id ?? ride._id,
+      driverId: booking.driver ?? (ride.driver as any)?._id ?? undefined,
+      rideId: ride._id,
+      status: ride.status,
+    });
+  };
+
   const handleCardPress = (ride: Ride) => {
-    const isScheduled = (ride as any).isScheduled === true;
-    const booking = (ride as any).booking;
-    // Scheduled bookings are surfaced from the ScheduledBooking
-    // collection (projected to Ride shape), so the Ride-tracking flow
-    // doesn't apply. Route them to ScheduledBookingDetails — the
-    // booking object carries the trip metadata that screen needs.
-    if (isScheduled && booking) {
-      navigation.navigate('ScheduledBookingDetails', {
-        // The card-id is prefixed `sched_<bookingId>` — no need to
-        // unpack it on the receiver since the booking object below
-        // already has the route + departure metadata.
-        route: {
-          id: booking.route,
-          name: booking.routeName ?? 'Scheduled trip',
-          from: ride.pickup?.address ?? '—',
-          to: ride.dropoff?.address ?? '—',
-          capacity: 0,
-          price: Math.round(
-            (ride.actualFare ?? ride.estimatedFare ?? 0) /
-              Math.max(1, (booking.seats ?? []).length),
-          ),
-          nextDeparture: booking.departureTime ?? '',
-          approvedDriverCount: 0,
-          hasRoundTripDriver: false,
-          durationMin: 0,
-          bookedSeats: 0,
-        },
-        boarding: {
-          id: 'b',
-          name: ride.pickup?.address ?? '—',
-          time: booking.departureTime ?? '',
-        },
-        dropping: {
-          id: 'd',
-          name: ride.dropoff?.address ?? '—',
-          time: booking.departureTime ?? '',
-        },
-        seats: booking.seats ?? [],
-        passengers: booking.passengers ?? [],
-        total: ride.actualFare ?? ride.estimatedFare ?? 0,
-        departureDate: booking.departureDate,
-        departureIndex: booking.departureIndex,
-        bookingId: booking.id ?? ride._id,
-      });
+    const isScheduled = (ride as any).isScheduled === true || ride.rideType === 'scheduled';
+    if (isScheduled) {
+      navigateToScheduledDetails(ride);
       return;
     }
     if (activeTab === 'active') {
@@ -324,24 +326,7 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
             <TouchableOpacity
               style={[styles.actionBtn, { borderColor: '#219EBC' }]}
               activeOpacity={0.8}
-              onPress={() => {
-                // Pass the booking's real metadata so the ticket renders the
-                // seats, passengers and QR without a follow-up fetch (the
-                // sched_ id isn't a real Ride, so getRide can't resolve it).
-                const b = (ride as any).booking ?? {};
-                navigation.navigate('ScheduledTripSummary', {
-                  boarding: { id: 'b', name: ride.pickup?.address ?? '—', time: b.departureTime ?? '' },
-                  dropping: { id: 'd', name: ride.dropoff?.address ?? '—', time: b.departureTime ?? '' },
-                  seats: b.seats ?? [],
-                  passengers: b.passengers ?? [],
-                  total: ride.actualFare ?? ride.estimatedFare ?? 0,
-                  departureDate: b.departureDate,
-                  departureIndex: b.departureIndex,
-                  bookingId: b.id ?? ride._id,
-                  driverId: b.driver ?? undefined,
-                  rideId: ride._id,
-                });
-              }}
+              onPress={() => navigateToScheduledDetails(ride)}
             >
               <Text style={[styles.actionText, { color: '#219EBC' }]}>View Details</Text>
             </TouchableOpacity>

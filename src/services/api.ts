@@ -96,10 +96,20 @@ api.interceptors.response.use(
         const { data } = await axios.post(`${BASE_URL}/auth/refresh-token`, {
           refreshToken: refresh,
         });
-        await setTokens(data.accessToken, data.refreshToken);
-        onRefreshed(data.accessToken);
+        // Backend shape is { success, data: { tokens: { accessToken,
+        // refreshToken } } } (authController.refreshToken). This used to read
+        // data.accessToken (undefined) — so EVERY refresh failed, tokens were
+        // wiped, and the user was force-logged-out the moment their access
+        // token expired, usually blamed on whatever screen they were on.
+        const newAccess = data?.data?.tokens?.accessToken;
+        const newRefresh = data?.data?.tokens?.refreshToken;
+        if (!newAccess || !newRefresh) {
+          throw new Error('refresh-token response missing tokens');
+        }
+        await setTokens(newAccess, newRefresh);
+        onRefreshed(newAccess);
         if (original.headers)
-          original.headers.Authorization = `Bearer ${data.accessToken}`;
+          original.headers.Authorization = `Bearer ${newAccess}`;
         return api(original);
       } catch {
         await clearTokens();

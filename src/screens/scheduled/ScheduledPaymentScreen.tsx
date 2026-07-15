@@ -21,7 +21,7 @@ import { paymentService } from '@/services/paymentService';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setWalletBalance as setGlobalWalletBalance } from '@/store/slices/appSlice';
 
-interface Stop { id: string; name: string; time: string }
+interface Stop { id: string; name: string; time: string; sequence?: number }
 
 interface Props {
   navigation: any;
@@ -89,9 +89,23 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
             seats,
             totalAmount: total,
             passengers,
+            boardingStopSequence: boarding.sequence,
+            droppingStopSequence: dropping.sequence,
+            // Server-side debit. Without this flag the backend reserved the
+            // seats without touching the wallet, and our local subtraction
+            // below "snapped back" on the next wallet fetch — riders were
+            // effectively booking for free.
+            paymentMethod: 'wallet',
           });
           const bookingId = booked?.booking?._id ?? booked?.booking?.id;
-          dispatch(setGlobalWalletBalance(Math.max(0, walletBalance - total)));
+          // Prefer the authoritative post-debit balance from the server.
+          dispatch(
+            setGlobalWalletBalance(
+              typeof booked?.walletBalance === 'number'
+                ? booked.walletBalance
+                : Math.max(0, walletBalance - total),
+            ),
+          );
 
           navigation.replace('ScheduledBookingDetails', {
             route: scheduledRoute,
@@ -180,6 +194,8 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
           seats,
           totalAmount: total,
           passengers,
+          boardingStopSequence: boarding.sequence,
+          droppingStopSequence: dropping.sequence,
         });
         const bookingId = booked?.booking?._id ?? booked?.booking?.id;
 

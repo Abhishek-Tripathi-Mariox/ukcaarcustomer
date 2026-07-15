@@ -68,7 +68,9 @@ function renderVehicleArt(code: string, size: number): React.ReactElement {
   return <TaxiBIcon size={size} />;
 }
 
-function seatsForType(code: string): number {
+// Fallback seat count derived from the type code, used only when the backend
+// hasn't been given an explicit `seats` capacity for the vehicle type yet.
+function seatsForCode(code: string): number {
   const c = code.toLowerCase();
   if (c.includes('bike') || c.includes('2-wheeler')) return 1;
   if (c.includes('auto') || c.includes('3-wheeler')) return 3;
@@ -77,6 +79,14 @@ function seatsForType(code: string): number {
   if (c.includes('muv') || c.includes('suv')) return 6;
   if (c.includes('tempo') || c.includes('traveller')) return 12;
   return 4;
+}
+
+// Prefer the admin-configured capacity from the backend; fall back to the
+// code heuristic so existing vehicle types (no `seats` set) still show a value.
+function seatsForType(type: { code: string; seats?: number }): number {
+  return typeof type.seats === 'number' && type.seats > 0
+    ? type.seats
+    : seatsForCode(type.code);
 }
 
 export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
@@ -271,7 +281,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
       rideType: {
         id: selectedType.code,
         name: selectedType.name,
-        seats: seatsForType(selectedType.code),
+        seats: seatsForType(selectedType),
         tier: selectedType.tier,
         price: est ? `₹${est.estimatedFare.toFixed(2)}` : '₹0.00',
         estimatedFare: est?.estimatedFare || 0,
@@ -405,7 +415,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
                 ? `₹ ${est.estimatedFare.toFixed(2)}`
                 : `₹ —`;
               const duration = est ? `${est.estimatedDuration} min` : '— min';
-              const seats = seatsForType(type.code);
+              const seats = seatsForType(type);
 
               return (
                 <TouchableOpacity

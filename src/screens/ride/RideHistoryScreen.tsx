@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
 import { useAppSelector } from '@/store/hooks';
@@ -47,6 +48,7 @@ const RIDE_TYPE_STYLES: Record<string, { bg: string; fg: string; label: string }
   premium: { bg: '#FAF5FF', fg: '#9810FA', label: 'Premium' },
   xl: { bg: '#ECFDF5', fg: '#059669', label: 'XL' },
   electric: { bg: '#F0F9FF', fg: '#0284C7', label: 'Electric' },
+  scheduled: { bg: '#F3E8FF', fg: '#9810FA', label: 'Shuttle' },
 };
 
 const formatDateTime = (iso: string) => {
@@ -118,9 +120,18 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
     }
   }, []);
 
-  useEffect(() => {
-    loadRides(true);
-  }, [loadRides]);
+  // Refetch every time the Activity tab regains focus, not just on first
+  // mount. The tab stays mounted, so with a plain useEffect a ride booked
+  // (or cancelled) after the first visit never showed up until pull-to-refresh
+  // — the main reason the Scheduled tab looked "completely empty". Spinner
+  // only on the very first load; later focuses refetch quietly.
+  const hasLoadedRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      loadRides(!hasLoadedRef.current);
+      hasLoadedRef.current = true;
+    }, [loadRides]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -130,19 +141,24 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
   const filteredRides = useMemo(() => {
     return rides.filter((r) => {
       const isScheduled = (r as any).isScheduled === true || r.rideType === 'scheduled';
-      // Scheduled-shuttle bookings live ONLY under the Scheduled tab — across
-      // every status (upcoming, completed, cancelled). The Active/Completed/
-      // Cancelled tabs are for instant/private rides only, so they never mix
-      // a shuttle ticket in with a regular ride.
+      // A scheduled booking whose shuttle is running RIGHT NOW (driver's journey
+      // active/in_progress, or the rider has boarded). The backend sets this on
+      // the projected row so the live one can surface in Active + be tracked.
+      const isActiveNow = (r as any).isActiveNow === true;
+      // Active tab = live instant/private rides AND live scheduled shuttles.
+      // Scheduled tab keeps everything scheduled that ISN'T live right now
+      // (upcoming, completed, cancelled) so a ticket is always findable there.
       switch (activeTab) {
         case 'active':
-          return !isScheduled && ACTIVE_STATUSES.includes(r.status);
+          return isScheduled
+            ? isActiveNow
+            : ACTIVE_STATUSES.includes(r.status);
         case 'completed':
           return !isScheduled && r.status === 'completed';
         case 'cancelled':
           return !isScheduled && r.status === 'cancelled';
         case 'scheduled':
-          return isScheduled;
+          return isScheduled && !isActiveNow;
         default:
           return false;
       }
@@ -194,10 +210,46 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
   };
 
   const navigateToScheduledDetails = (ride: Ride) => {
-    const isFinished = ride.status === 'completed' || ride.status === 'cancelled';
-    const targetScreen = isFinished ? 'ScheduledTripSummary' : 'ScheduledBookingDetails';
     const booking = (ride as any).booking ?? {};
+    const bookingId = booking.id ?? String(ride._id).replace(/^sched_/, '');
+    const fromName = ride.pickup?.address ?? '—';
+    const toName = ride.dropoff?.address ?? '—';
+    const fare = ride.actualFare ?? ride.estimatedFare ?? 0;
+
+    // A COMPLETED trip → the Trip Summary (recap), NOT the ticket. If the trip
+    // ended in an approved early drop, show the partial-fare/refund variant.
+    if (ride.status === 'completed') {
+      const ed = booking.earlyDrop;
+      const earlyDropped = ed?.status === 'approved';
+      navigation.navigate('ScheduledEarlyDropSummary', {
+        bookingId,
+        routeId: booking.route,
+        routeName: booking.routeName ?? 'Scheduled trip',
+        fromName,
+        toName,
+        seats: booking.seats ?? [],
+        passengers: booking.passengers ?? [],
+        departureDate: booking.departureDate,
+        departureIndex: booking.departureIndex,
+        driverId: booking.driver,
+        dateLabel: formatDateTime(ride.createdAt),
+        completed: !earlyDropped,
+        ...(earlyDropped
+          ? {
+              originalFare: ed?.originalFare ?? fare,
+              partialFare: ed?.partialFare ?? 0,
+              refund: ed?.refund ?? 0,
+            }
+          : { fare }),
+      });
+      return;
+    }
+
+    // Cancelled → the ticket/invoice record; anything still live/upcoming →
+    // the state-driven trip hub (Departing → Boarding → On Board → Track Live).
+    const targetScreen = ride.status === 'cancelled' ? 'ScheduledTripSummary' : 'ScheduledTripHub';
     navigation.navigate(targetScreen, {
+      routeId: booking.route ?? (ride as any).route ?? undefined,
       route: {
         id: booking.route || (ride as any).route || ride._id,
         name: booking.routeName ?? (ride as any).routeName ?? 'Scheduled trip',
@@ -239,6 +291,8 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
   const handleCardPress = (ride: Ride) => {
     const isScheduled = (ride as any).isScheduled === true || ride.rideType === 'scheduled';
     if (isScheduled) {
+      // Every scheduled booking opens the trip hub; the hub itself decides the
+      // stage (and routes an on-board rider to live tracking + emergency drop).
       navigateToScheduledDetails(ride);
       return;
     }

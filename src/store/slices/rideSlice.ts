@@ -8,6 +8,12 @@ interface RideState {
   dropoff: Location | null;
   rideType: RideType;
   estimateData: EstimateResponse | null;
+  /** requestId of the most recently DISPATCHED estimateFare. Used to ignore a
+   *  slow earlier response (the straight-line estimate) that resolves after the
+   *  routed one — otherwise it overwrites estimateData with the Haversine
+   *  distance/fare, so the booked ride (and wallet debit) revert to a lower
+   *  amount than the routed fare the rider actually saw. */
+  estimateReqId: string | null;
   selectedVehicle: string | null;
   currentRide: Ride | null;
   rides: Ride[];
@@ -20,6 +26,7 @@ const initialState: RideState = {
   dropoff: null,
   rideType: 'instant',
   estimateData: null,
+  estimateReqId: null,
   selectedVehicle: null,
   currentRide: null,
   rides: [],
@@ -110,12 +117,21 @@ const rideSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(estimateFare.pending, (state) => { state.loading = true; })
+      .addCase(estimateFare.pending, (state, action) => {
+        state.loading = true;
+        // Mark this as the latest estimate request. Only its result will be
+        // applied — a slower earlier request that resolves afterward is dropped.
+        state.estimateReqId = action.meta.requestId;
+      })
       .addCase(estimateFare.fulfilled, (state, action) => {
+        // Ignore stale responses: only the most-recently-dispatched estimate
+        // (the routed one) is allowed to set estimateData.
+        if (action.meta.requestId !== state.estimateReqId) return;
         state.loading = false;
         state.estimateData = action.payload;
       })
       .addCase(estimateFare.rejected, (state, action) => {
+        if (action.meta.requestId !== state.estimateReqId) return;
         state.loading = false;
         state.error = action.payload as string;
       })

@@ -265,8 +265,11 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
       route: scheduledRoute,
       // Downstream screens read `.name` and `.time` only, so the shape
       // stays compatible with Vehicle / Seat / FareSummary / BookingDetails.
-      boarding: { id: boarding.id, name: boarding.name, time: boarding.time },
-      dropping: { id: dropping.id, name: dropping.name, time: dropping.time },
+      // `.sequence` rides along so the booking can persist the booked segment
+      // (powers the early-drop partial-fare recompute) without threading extra
+      // params through every screen.
+      boarding: { id: boarding.id, name: boarding.name, time: boarding.time, sequence: boarding.sequence },
+      dropping: { id: dropping.id, name: dropping.name, time: dropping.time, sequence: dropping.sequence },
       // Real trip identity so the seat screen can fetch live availability
       // and the payment screen can atomically reserve. departureDate is
       // YYYY-MM-DD; departureIndex is the row position in the route's

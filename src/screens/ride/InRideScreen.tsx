@@ -115,12 +115,13 @@ export const InRideScreen: React.FC<InRideScreenProps> = ({
             driver,
           });
         } else if (payload.status === 'cancelled') {
-          navigation.replace('CancelRide', { rideId });
+          // Server-side cancel — go home, not to the cancel CONFIRMATION screen.
+          navigation.popToTop();
         }
       },
       onRideCancelled: (payload) => {
         if (payload.rideId !== rideId) return;
-        navigation.replace('CancelRide', { rideId });
+        navigation.popToTop();
       },
     });
 

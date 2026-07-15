@@ -222,10 +222,22 @@ export const ScheduledBookingDetailsScreen: React.FC<Props> = ({ navigation, rou
           style={styles.trackBtn}
           activeOpacity={0.85}
           onPress={() =>
-            navigation.navigate('ScheduledTrack', { routeId: scheduledRoute.id })
+            navigation.navigate('ScheduledTripHub', {
+              bookingId: bookingId ?? '',
+              routeId: scheduledRoute.id,
+              route: scheduledRoute,
+              boarding,
+              dropping,
+              seats,
+              passengers,
+              total,
+              departureDate,
+              departureIndex,
+              driverId,
+            })
           }
         >
-          <Text style={styles.trackText}>Track Vehicle</Text>
+          <Text style={styles.trackText}>View Trip Status</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

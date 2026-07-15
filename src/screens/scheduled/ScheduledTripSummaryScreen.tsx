@@ -334,13 +334,13 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={isFinished ? () => navigation.goBack() : handleGoHome}
+          onPress={() => navigation.goBack()}
           style={styles.backBoxBtn}
           activeOpacity={0.8}
         >
           <Ionicons name="chevron-back" size={20} color={Colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trip Summary</Text>
+        <Text style={styles.headerTitle}>Your Ticket</Text>
         <View style={{ width: s(34) }} />
       </View>
 

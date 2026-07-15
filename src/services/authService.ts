@@ -61,14 +61,29 @@ export interface UpdateProfilePayload {
   language?: string;
 }
 
+// This is the customer app, so every OTP call is tagged as such. The backend
+// uses this to keep driver/admin accounts out of the customer app (they share
+// one OTP endpoint and one User collection).
+const APP_TYPE = 'customer' as const;
+
 export const authService = {
   sendOtp: async (payload: SendOtpPayload) => {
-    const { data } = await api.post('/auth/send-otp', payload);
+    const { data } = await api.post('/auth/send-otp', { ...payload, appType: APP_TYPE });
     return data;
   },
 
   verifyOtp: async (payload: VerifyOtpPayload): Promise<AuthResponse> => {
-    const { data } = await api.post<AuthResponse>('/auth/verify-otp', payload);
+    const { data } = await api.post<AuthResponse>('/auth/verify-otp', { ...payload, appType: APP_TYPE });
+    // Defence in depth: even if an older backend (without the server-side role
+    // guard) hands us a driver account, refuse it and drop the tokens the
+    // request just persisted, so no driver session survives in the customer app.
+    if (data.success && data.data?.user && data.data.user.role !== 'customer') {
+      await clearTokens();
+      await AsyncStorage.removeItem('user');
+      const err: any = new Error('This number is registered as a driver. Please use the UKCAAR Driver app.');
+      err.response = { status: 403, data: { message: err.message } };
+      throw err;
+    }
     if (data.success && data.data?.tokens) {
       await setTokens(data.data.tokens.accessToken, data.data.tokens.refreshToken);
       await AsyncStorage.setItem('user', JSON.stringify(data.data.user));

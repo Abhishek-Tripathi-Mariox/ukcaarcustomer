@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only: run the customer app's Metro dev server on 8082 so it can run
+     alongside the driver app (which uses the default 8081) on the same device.
+     This file is under src/debug so it does NOT affect release builds. -->
+<resources>
+    <integer name="react_native_dev_server_port">8082</integer>
+</resources>

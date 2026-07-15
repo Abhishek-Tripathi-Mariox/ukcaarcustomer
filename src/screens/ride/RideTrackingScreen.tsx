@@ -405,15 +405,28 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
           });
         }
         if (next === 'cancelled') {
-          navigation.replace('CancelRide', { rideId });
+          // The ride was cancelled server-side (driver/admin/auto). Do NOT go
+          // to CancelRide — that's the "are you sure you want to cancel?"
+          // CONFIRMATION screen, which told a customer whose driver just bailed
+          // that the driver was "almost there". Show what happened and go home.
+          dispatch(setCurrentRide(null));
+          Alert.alert('Ride cancelled', 'Your ride was cancelled.');
+          navigation.popToTop();
         }
       },
-      // Server-side cancel mid-ride (admin or driver). The `ride:status`
-      // event also fires with status='cancelled' in some paths, but the
-      // dedicated event carries a `reason` we can surface to the user.
+      // Server-side cancel mid-ride (admin or driver). The dedicated event
+      // carries a `reason`/`message` we can surface to the user.
       onRideCancelled: payload => {
         if (payload.rideId !== rideId) return;
-        navigation.replace('CancelRide', { rideId });
+        dispatch(setCurrentRide(null));
+        Alert.alert(
+          'Ride cancelled',
+          payload.message ||
+            (payload.cancelledBy === 'driver'
+              ? 'Your driver cancelled this ride. Please book again.'
+              : payload.reason || 'Your ride was cancelled.'),
+        );
+        navigation.popToTop();
       },
     });
 

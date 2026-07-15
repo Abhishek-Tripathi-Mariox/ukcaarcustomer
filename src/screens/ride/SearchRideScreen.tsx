@@ -19,6 +19,7 @@ import { setPickup, setDropoff } from '@/store/slices/rideSlice';
 import { geoService, GeoSuggestion } from '@/services/geoService';
 import { rideService } from '@/services/rideService';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
+import { DEFAULT_COORDS } from '@/utils/location';
 
 interface SearchRideScreenProps {
   navigation: any;
@@ -42,8 +43,8 @@ const FALLBACK_PICKUP: SearchLocation = {
   name: 'Current Location',
   address: 'Detecting your location…',
   type: 'location',
-  lat: 28.6328,
-  lng: 77.2197,
+  lat: DEFAULT_COORDS.lat,
+  lng: DEFAULT_COORDS.lng,
 };
 
 export const SearchRideScreen: React.FC<SearchRideScreenProps> = ({ navigation }) => {

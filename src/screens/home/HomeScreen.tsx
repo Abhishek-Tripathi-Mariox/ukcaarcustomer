@@ -96,16 +96,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const notificationCount = useAppSelector((state) => state.app.notificationCount);
   const dispatch = useAppDispatch();
 
-  useEffect(() => {
-    paymentService.getWallet().then((res) => {
-      if (res.success) dispatch(setWalletBalance(res.data.wallet?.balance || 0));
-    }).catch(() => {});
-  }, [dispatch]);
-
-  // Keep the unread-notification badge current: refresh whenever Home regains
-  // focus (e.g. returning from the Notifications screen after reading some).
+  // Refresh the wallet balance whenever Home regains focus — not just on first
+  // mount. Home is a persistent tab, so a mount-only fetch showed a STALE
+  // balance after a wallet-paid booking (the debit happened server-side but the
+  // chip never re-read it), which read as "my wallet didn't go down".
   useFocusEffect(
     useCallback(() => {
+      paymentService.getWallet().then((res) => {
+        if (res.success) dispatch(setWalletBalance(res.data.wallet?.balance || 0));
+      }).catch(() => {});
       dispatch(refreshNotificationCount());
     }, [dispatch]),
   );

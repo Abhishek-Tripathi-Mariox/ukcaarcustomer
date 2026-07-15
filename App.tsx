@@ -159,6 +159,9 @@ function ResumeRideBridge() {
             return {
               screen: 'FindingDriver',
               params: {
+                // Pass the EXISTING ride id so FindingDriver resumes it instead
+                // of creating a second ride (which 409s and strands the user).
+                rideId: String(ride._id),
                 pickup: ride.pickup.address,
                 dropoff: ride.dropoff.address,
                 rideType: { id: ride.rideType, name: ride.rideType },

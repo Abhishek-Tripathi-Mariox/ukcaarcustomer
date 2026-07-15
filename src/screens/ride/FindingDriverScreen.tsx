@@ -39,6 +39,9 @@ interface FindingDriverScreenProps {
       pickup: string;
       dropoff: string;
       rideType: any;
+      /** Set only when RESUMING an existing searching ride on app relaunch —
+       *  the screen then waits for that ride instead of creating a new one. */
+      rideId?: string;
     };
   };
 }
@@ -57,6 +60,10 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
   const pickupLoc = useSelector((s: RootState) => s.ride.pickup);
   const dropoffLoc = useSelector((s: RootState) => s.ride.dropoff);
   const currentRide = useSelector((s: RootState) => s.ride.currentRide);
+  // Routed distance/duration the rider was quoted on SelectRide (top-level
+  // fields on the estimate). Forwarded to createRide so the booked ride keeps
+  // the same road distance rather than the backend's straight-line fallback.
+  const estimateData = useSelector((s: RootState) => s.ride.estimateData);
 
   const pulse1 = useRef(new Animated.Value(0)).current;
   const pulse2 = useRef(new Animated.Value(0)).current;
@@ -182,6 +189,18 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
       // bridge. Idempotent connect — no-op if already connected.
       connectSocket().catch(() => {});
 
+      // RESUME path: the app was killed while a ride was still 'searching' and
+      // App.tsx re-routed us here with the existing rideId. Do NOT create a
+      // second ride — the backend one-active-ride guard would 409 and the user
+      // would be bounced off this screen while the real ride kept searching
+      // invisibly. Just adopt the existing ride and wait for its assignment.
+      if (route.params.rideId) {
+        if (cancelled) return;
+        setCreatedRideId(route.params.rideId);
+        setStatusText('We are connecting you with the nearest driver');
+        return;
+      }
+
       if (!pickupLoc || !dropoffLoc) {
         Alert.alert(
           'Missing pickup',
@@ -203,17 +222,31 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
             // can't be resolved.
             isPrivate: rideType?.tier === 'private' || rideType?.isPrivate === true,
             paymentMethod: 'cash',
+            // Persist the road distance/duration already quoted to the rider
+            // (undefined if the estimate never resolved → backend Haversine).
+            distance: estimateData?.distance,
+            duration: estimateData?.duration,
           }),
         );
 
-        if (cancelled) return;
         // Redux thunk returns a typed action — fulfilled means the backend
         // has the ride; rejected means we never got a server-side record
         // and there's nothing to wait for.
         if (createRideThunk.fulfilled.match(action)) {
-          setCreatedRideId(action.payload._id);
+          const newRideId = action.payload._id;
+          if (cancelled) {
+            // The user backed out of this screen while the create was still
+            // in flight. Cancel the ride we just created — otherwise it lingers
+            // as a ghost: it blocks the next booking (409 "already have an
+            // active ride") until the 5-min auto-cancel, and a driver can be
+            // paged to a pickup with nobody there.
+            dispatch(cancelRideThunk({ id: newRideId, reason: 'Cancelled while searching' }));
+            return;
+          }
+          setCreatedRideId(newRideId);
           setStatusText('We are connecting you with the nearest driver');
         } else {
+          if (cancelled) return;
           Alert.alert(
             'Could not request ride',
             (action.payload as string) ?? 'Please try again.',

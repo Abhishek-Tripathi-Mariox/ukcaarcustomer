@@ -122,16 +122,27 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
   };
 
-  const handleSubmitRating = (rating: number, feedback: string) => {
+  const handleSubmitRating = async (rating: number, feedback: string) => {
     setRatingVisible(false);
-    // Persist the rating to the backend (was a no-op before). Fire-and-forget
-    // so a slow network doesn't hold up the "thank you" → home transition.
-    if (rideId) {
-      rideService
-        .rateRide(rideId, rating, feedback || undefined)
-        .catch(() => {});
+    // A 0-star rating is not a real submission (and the backend rejects
+    // rating < 1). Skip silently instead of claiming success.
+    if (!rideId || rating < 1) {
+      handleDone();
+      return;
     }
-    Alert.alert('Thank you!', `Your ${rating}-star rating has been submitted.`);
+    try {
+      await rideService.rateRide(rideId, rating, feedback || undefined);
+      Alert.alert('Thank you!', 'Your rating has been submitted.');
+    } catch (err: any) {
+      // Don't lie "submitted" when it failed — the backend rejects a rating on
+      // a ride that isn't `completed` yet (e.g. a cash ride not confirmed), and
+      // the old code swallowed that error and still showed a success message.
+      Alert.alert(
+        'Rating not saved',
+        err?.response?.data?.message ||
+          'We could not save your rating right now. You can rate this trip later from your ride history.',
+      );
+    }
     setTimeout(handleDone, 300);
   };
 

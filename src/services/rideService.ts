@@ -32,6 +32,14 @@ export interface CreateRidePayload {
   scheduledAt?: string;
   /** Routes the ride to the private (premium) driver pool. */
   isPrivate?: boolean;
+  /**
+   * Real-route distance (km) / duration (min) resolved via /geo/directions and
+   * already shown to the rider on SelectRide. Sent so the backend persists the
+   * quoted road distance instead of recomputing straight-line Haversine (which
+   * disagrees with the quote whenever Google/OSRM are reachable).
+   */
+  distance?: number;
+  duration?: number;
 }
 
 export interface Ride {
@@ -192,4 +200,7 @@ export interface NearbyVehicleType {
   tier: 'instant' | 'private';
   /** How many drivers within 7km are registered for this type. */
   availableCount: number;
+  /** Admin-configured passenger seat capacity. Undefined until an admin sets
+   *  it on the vehicle type, in which case the app uses a code heuristic. */
+  seats?: number;
 }

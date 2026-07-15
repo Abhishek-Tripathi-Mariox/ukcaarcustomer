@@ -175,6 +175,14 @@ export const routeService = {
       /** Per-seat passenger details, persisted so the ticket/history can
        *  show who each seat is for. */
       passengers?: { seat: number; name: string; contact?: string }[];
+      /** 'wallet' → the backend debits the UKCAAR wallet server-side and
+       *  returns the new `walletBalance`. Omit for Razorpay (already paid
+       *  before this call). */
+      paymentMethod?: 'wallet';
+      /** `sequence` of the booked boarding / dropping stops. Persisted so an
+       *  early-drop can recompute the partial fare over the booked segment. */
+      boardingStopSequence?: number;
+      droppingStopSequence?: number;
     },
   ): Promise<any> => {
     const { data } = await api.post(`/routes/${routeId}/book`, opts);
@@ -189,4 +197,78 @@ export const routeService = {
     const { data } = await api.post(`/routes/bookings/${bookingId}/cancel`);
     return data?.data;
   },
+
+  /**
+   * Ask the driver to let the rider off before their booked stop (the
+   * "Emergency → Need to Stop Mid-Route" flow). Records the request and pings
+   * the driver; the fare is only recomputed once the driver approves.
+   */
+  requestEarlyDrop: async (bookingId: string, reason?: string): Promise<any> => {
+    const { data } = await api.post(
+      `/routes/bookings/${bookingId}/early-drop/request`,
+      reason ? { reason } : {},
+    );
+    return data?.data;
+  },
+
+  /** Withdraw a still-pending early-drop request. */
+  cancelEarlyDrop: async (bookingId: string): Promise<any> => {
+    const { data } = await api.post(`/routes/bookings/${bookingId}/early-drop/cancel`);
+    return data?.data;
+  },
+
+  /** Post-trip rating (1–5) + optional feedback for a scheduled booking. */
+  rateBooking: async (
+    bookingId: string,
+    rating: number,
+    feedback?: string,
+  ): Promise<any> => {
+    const { data } = await api.post(`/routes/bookings/${bookingId}/rate`, {
+      rating,
+      ...(feedback ? { feedback } : {}),
+    });
+    return data;
+  },
+
+  /** Live trip state for the onboarding hub (poll while the trip is upcoming/
+   *  active). Drives the Departing → Arriving → Arrived → Boarded stages. */
+  getBookingStatus: async (bookingId: string): Promise<BookingStatus> => {
+    const { data } = await api.get<{ success: boolean; data: BookingStatus }>(
+      `/routes/bookings/${bookingId}/status`,
+    );
+    return data.data;
+  },
 };
+
+export interface BookingStatus {
+  bookingId: string;
+  status: 'reserved' | 'completed' | 'cancelled';
+  routeId: string;
+  routeName: string | null;
+  boardingName: string | null;
+  droppingName: string | null;
+  departureDate: string;
+  departureTime: string;
+  minutesToDeparture: number | null;
+  seats: number[];
+  journeyStatus: string | null;
+  journeyActive: boolean;
+  atBoarding: boolean;
+  boarded: boolean;
+  driver: {
+    id: string;
+    name: string;
+    phone: string | null;
+    avatar: string | null;
+    rating: number | null;
+    vehicle: { make: string; model: string; color: string; plateNumber: string };
+  } | null;
+  driverLocation: { lat: number; lng: number } | null;
+  earlyDrop: {
+    status?: string;
+    originalFare?: number;
+    partialFare?: number;
+    refund?: number;
+    dropStopSequence?: number;
+  } | null;
+}

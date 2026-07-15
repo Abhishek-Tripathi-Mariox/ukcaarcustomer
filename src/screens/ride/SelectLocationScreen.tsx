@@ -27,6 +27,7 @@ import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { driverService, NearbyDriver } from '@/services/driverService';
 import { rideService } from '@/services/rideService';
 import { CabIcon } from '@/components/icons/HomeIcons';
+import { DEFAULT_COORDS } from '@/utils/location';
 
 const { width, height } = Dimensions.get('window');
 
@@ -85,8 +86,8 @@ const haversineKm = (
 // Last-resort coordinates if GPS is denied or unavailable.
 const FALLBACK_PICKUP = {
   address: 'Detecting your location…',
-  lat: 28.6270,
-  lng: 77.3650,
+  lat: DEFAULT_COORDS.lat,
+  lng: DEFAULT_COORDS.lng,
 };
 
 export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({

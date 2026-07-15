@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -76,25 +76,16 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
     !!scheduledRoute.hasRoundTripDriver &&
     (scheduledRoute.returnDepartures?.length ?? 0) > 0;
 
-  const [returnEnabled, setReturnEnabled] = useState(false);
-  const [returnTime, setReturnTime] = useState<string | null>(
-    returnAvailable ? scheduledRoute.returnDepartures![0].time : null,
-  );
-
   const seatsList = seats.join(', ');
   const oneWayTotal = seats.length * perSeat;
-  const total = returnEnabled ? oneWayTotal * 2 : oneWayTotal;
+  // Round-trip is NOT bookable yet: the /routes/:id/book endpoint only reserves
+  // a forward departureIndex, while returnDepartures live in a separate schedule
+  // array with no reservation path (reversed stops + return seat availability
+  // aren't handled). The old code did `oneWayTotal * 2` and booked a single leg,
+  // so the rider paid double and got one trip. Until return booking is built
+  // end-to-end we bill the one-way fare only and show round-trip as "coming soon".
+  const total = oneWayTotal;
   const dateLabel = formatDate(departureDate);
-
-  // Return departures filtered to those strictly after the forward time.
-  // Keeps the picker honest: a return can't be scheduled before the rider
-  // even leaves.
-  const returnOptions = useMemo(() => {
-    const all = scheduledRoute.returnDepartures ?? [];
-    const forwardTime = boarding?.time;
-    if (!forwardTime) return all;
-    return all.filter((d) => d.time > forwardTime);
-  }, [scheduledRoute.returnDepartures, boarding?.time]);
 
   const handleConfirm = () => {
     navigation.navigate('ScheduledPayment', {
@@ -108,8 +99,6 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
       departureIndex,
       driverId,
       vehicle,
-      returnDeparture:
-        returnEnabled && returnTime ? { time: returnTime } : undefined,
     });
   };
 
@@ -188,70 +177,23 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
             </View>
           </View>
 
-          {/* Round-trip — only when the route supports it. Kept the
-              existing UX since the Figma covers the base case but the
-              feature itself is admin-configured per route. */}
+          {/* Round-trip — the route advertises a return driver, but in-app
+              return booking isn't wired up yet (no reservation path for the
+              return departure), so we show it as informational only and never
+              add it to the charge. See the `total` comment above. */}
           {returnAvailable && (
             <>
               <View style={styles.divider} />
               <View style={styles.returnCard}>
                 <View style={styles.returnHeader}>
                   <Ionicons name="repeat" size={18} color={Colors.primary} />
-                  <Text style={styles.returnTitle}>Round-trip available</Text>
+                  <Text style={styles.returnTitle}>Round-trip coming soon</Text>
                 </View>
                 <Text style={styles.returnHelp}>
-                  Your driver also runs the return leg of this route.
+                  Your driver also runs the return leg. Return booking isn't
+                  available in the app yet — for now please book the return
+                  separately. You'll only be charged for this one-way trip.
                 </Text>
-                <TouchableOpacity
-                  style={[styles.toggleRow, returnEnabled && styles.toggleRowOn]}
-                  onPress={() => setReturnEnabled((v) => !v)}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[styles.toggleLabel, returnEnabled && styles.toggleLabelOn]}
-                  >
-                    {returnEnabled ? 'Return added' : 'Add return trip'}
-                  </Text>
-                  <View
-                    style={[styles.toggleKnob, returnEnabled && styles.toggleKnobOn]}
-                  />
-                </TouchableOpacity>
-
-                {returnEnabled && (
-                  <View style={styles.returnPickerRow}>
-                    <Text style={styles.returnPickerLabel}>Return at</Text>
-                    <View style={styles.returnTimes}>
-                      {returnOptions.map((d) => {
-                        const selected = d.time === returnTime;
-                        return (
-                          <TouchableOpacity
-                            key={d.time}
-                            onPress={() => setReturnTime(d.time)}
-                            style={[
-                              styles.returnTimeChip,
-                              selected && styles.returnTimeChipOn,
-                            ]}
-                            activeOpacity={0.8}
-                          >
-                            <Text
-                              style={[
-                                styles.returnTimeText,
-                                selected && styles.returnTimeTextOn,
-                              ]}
-                            >
-                              {d.time}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                      {returnOptions.length === 0 && (
-                        <Text style={styles.returnPickerLabel}>
-                          No return times left for today.
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                )}
               </View>
             </>
           )}
@@ -273,15 +215,6 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
             <Text style={styles.fareValue}>₹{oneWayTotal}</Text>
           </View>
 
-          {returnEnabled && (
-            <View style={styles.fareRow}>
-              <Text style={styles.fareLabel}>
-                Return leg ({seats.length} × ₹{perSeat})
-              </Text>
-              <Text style={styles.fareValue}>₹{oneWayTotal}</Text>
-            </View>
-          )}
-
           <View style={styles.divider} />
 
           <View style={styles.totalRow}>
@@ -293,12 +226,8 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[
-            styles.cta,
-            returnEnabled && !returnTime && { opacity: 0.5 },
-          ]}
+          style={styles.cta}
           onPress={handleConfirm}
-          disabled={returnEnabled && !returnTime}
           activeOpacity={0.85}
         >
           <Text style={styles.ctaText}>Confirm & Pay</Text>

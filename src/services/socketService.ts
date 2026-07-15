@@ -26,8 +26,15 @@ let socket: Socket | null = null;
 //   2. After a reconnect (network blip, app foregrounding), socket.io
 //      doesn't carry over room membership; we re-emit so the customer
 //      keeps receiving driver:location:update for their active ride.
-// `leaveRideRoom()` removes from this set.
-const joinedRooms = new Set<string>();
+// `leaveRideRoom()` decrements; the room is only left when the count hits 0.
+//
+// Refcounted (rideId → join count) rather than a plain Set because screens
+// hand off via `navigation.replace` (RideTracking → InRide): the new screen
+// joins the room on mount, then the OLD screen's unmount cleanup fires and
+// called `ride:leave` — silently kicking the customer out of their own ride
+// room for the whole in-progress phase (frozen cab marker + dead chat). With
+// a refcount the room survives until the last holder leaves.
+const joinedRooms = new Map<string, number>();
 // Mirror of `joinedRooms` for scheduled-route subscriptions. Kept
 // separate so a `ride:leave` doesn't accidentally drop the rider out
 // of their scheduled-shuttle room (different room namespace on the
@@ -67,6 +74,22 @@ type Listeners = {
     type?: string;
     timestamp: number;
   }) => void;
+  /** The driver approved the rider's early-drop request — carries the
+   *  recomputed fare + refund for the "Ride Ended / Early Drop" summary. */
+  onEarlyDropApproved?: (payload: {
+    bookingId: string;
+    originalFare: number;
+    partialFare: number;
+    refund: number;
+    refundMethod?: string;
+    dropStopName?: string;
+    droppedAt?: string;
+  }) => void;
+  /** The driver couldn't safely stop — the request was declined. */
+  onEarlyDropDeclined?: (payload: { bookingId: string; reason?: string }) => void;
+  /** The driver boarded the rider's seat — the onboarding hub advances to
+   *  "You've Boarded Successfully!". */
+  onScheduledBoarded?: (payload: { bookingId: string; seats?: number[] }) => void;
 };
 
 let listeners: Listeners = {};
@@ -101,7 +124,7 @@ export async function connectSocket(): Promise<Socket | null> {
     // this), and a reconnect after a network blip where the server has
     // forgotten our rooms. Cheap to spam — the server's ride:join handler
     // is idempotent.
-    for (const rideId of joinedRooms) {
+    for (const rideId of joinedRooms.keys()) {
       s.emit('ride:join', rideId);
     }
     for (const routeId of joinedRouteRooms) {
@@ -131,6 +154,18 @@ export async function connectSocket(): Promise<Socket | null> {
     listeners.onChatMessage?.(payload);
   });
 
+  s.on('scheduled:early-drop-approved', payload => {
+    listeners.onEarlyDropApproved?.(payload);
+  });
+
+  s.on('scheduled:early-drop-declined', payload => {
+    listeners.onEarlyDropDeclined?.(payload);
+  });
+
+  s.on('scheduled:boarded', payload => {
+    listeners.onScheduledBoarded?.(payload);
+  });
+
   socket = s;
   return s;
 }
@@ -146,16 +181,24 @@ export function disconnectSocket(): void {
  *  Idempotent and connect-safe: if the socket isn't ready yet, the join
  *  is queued and replayed once the connection comes up. */
 export function joinRideRoom(rideId: string): void {
-  joinedRooms.add(rideId);
-  if (socket?.connected) {
+  const count = joinedRooms.get(rideId) ?? 0;
+  joinedRooms.set(rideId, count + 1);
+  // Only emit the actual join the first time (count 0 → 1); further holders
+  // just bump the refcount.
+  if (count === 0 && socket?.connected) {
     socket.emit('ride:join', rideId);
   }
 }
 
 export function leaveRideRoom(rideId: string): void {
-  joinedRooms.delete(rideId);
-  if (socket?.connected) {
-    socket.emit('ride:leave', rideId);
+  const count = joinedRooms.get(rideId) ?? 0;
+  if (count <= 1) {
+    joinedRooms.delete(rideId);
+    if (socket?.connected) {
+      socket.emit('ride:leave', rideId);
+    }
+  } else {
+    joinedRooms.set(rideId, count - 1);
   }
 }
 

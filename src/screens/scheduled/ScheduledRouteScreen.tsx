@@ -329,7 +329,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
                     <Ionicons name="card-outline" size={12} color="#6A7282" />
                     <Text style={styles.metricLabel}>Price</Text>
                   </View>
-                  <Text style={styles.metricValue}>\u20B9 {r.price}</Text>
+                  <Text style={styles.metricValue}>{'\u20B9'} {r.price}</Text>
                 </View>
               </View>
 

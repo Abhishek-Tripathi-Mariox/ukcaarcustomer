@@ -67,6 +67,9 @@ import {
   ScheduledBookingDetailsScreen,
   ScheduledTripSummaryScreen,
   ScheduledTrackScreen,
+  ScheduledLiveTrackScreen,
+  ScheduledEarlyDropSummaryScreen,
+  ScheduledTripHubScreen,
 } from '@/screens/scheduled';
 
 // ── Account / Profile Screen — matches Figma node 49:1365 ──
@@ -612,6 +615,13 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen name="ScheduledBookingDetails" component={ScheduledBookingDetailsScreen} />
       <Stack.Screen name="ScheduledTripSummary" component={ScheduledTripSummaryScreen} />
       <Stack.Screen name="ScheduledTrack" component={ScheduledTrackScreen} />
+      <Stack.Screen
+        name="ScheduledLiveTrack"
+        component={ScheduledLiveTrackScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen name="ScheduledEarlyDropSummary" component={ScheduledEarlyDropSummaryScreen} />
+      <Stack.Screen name="ScheduledTripHub" component={ScheduledTripHubScreen} />
     </Stack.Navigator>
   );
 };

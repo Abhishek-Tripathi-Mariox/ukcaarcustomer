@@ -317,10 +317,15 @@ export const PlanRideScreen: React.FC<any> = ({ navigation, route }: PlanRideScr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQuery, touched, liveCoords?.lat, liveCoords?.lng]);
 
+  // Saved places appear ONLY when the "Saved places" toggle is on. Idle with
+  // the toggle off shows the action rows + the "start typing" hint, not the
+  // saved list (which used to leak in here regardless of the toggle). Focusing
+  // a field resets showSavedOnly (beginEdit), so the toggle never fights an
+  // active search.
   const listData: Suggestion[] =
     showSavedOnly ? savedSuggestions
     : isSearching ? results
-    : savedSuggestions;
+    : [];
 
   const commit = (s: Suggestion) => {
     const loc = {

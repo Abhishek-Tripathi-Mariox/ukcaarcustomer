@@ -6,7 +6,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius, Shadow } from '@/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { logout, fetchProfile } from '@/store/slices/authSlice';
+import { logout, forceLogout, fetchProfile } from '@/store/slices/authSlice';
+import { authService } from '@/services/authService';
 import { setWalletBalance } from '@/store/slices/appSlice';
 import { paymentService } from '@/services/paymentService';
 import { appSettingsService } from '@/services/appSettingsService';
@@ -110,14 +111,59 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
+              // logout() flips isAuthenticated false; AppNavigator's centralized
+              // ejection effect resets to the Auth stack — no manual reset here.
               await dispatch(logout()).unwrap();
-              navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Auth' }] });
             } catch (err) {
               Alert.alert('Error', 'Failed to log out. Please try again.');
             }
           },
         },
       ]
+    );
+  };
+
+  // Delete Account used to live only on the orphaned SettingsScreen (nothing
+  // navigated there), so riders couldn't reach it. Surface it here on the
+  // Account tab. forceLogout flips isAuthenticated synchronously so the app
+  // returns to the login stack immediately after deletion.
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This action is permanent and cannot be undone. Your account will be deactivated and you will be logged out.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authService.deleteAccount();
+            } catch (err: any) {
+              Alert.alert('Error', err?.response?.data?.message || 'Failed to delete account. Please try again.');
+              return;
+            }
+            Alert.alert(
+              'Account deleted',
+              'Your account has been deleted. You can sign up again with the same number any time.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // forceLogout ends the session; AppNavigator's centralized
+                    // ejection effect resets to the Auth stack.
+                    dispatch(forceLogout());
+                    // Local-only cleanup (tokens + FCM). Skip the server logout
+                    // — the account is already deleted, so POST /auth/logout
+                    // would 401 and needlessly trip the refresh interceptor.
+                    authService.logout(false).catch(() => {});
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
     );
   };
 
@@ -311,6 +357,18 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         >
           <View style={profileStyles.rowIcon}><LogoutIcon size={22} color="#1B1D21" /></View>
           <Text style={profileStyles.rowLabel}>Logout</Text>
+          <ChevronRightIcon size={24} color="#6B7280" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={profileStyles.row}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.7}
+        >
+          <View style={profileStyles.rowIcon}>
+            <Ionicons name="trash-outline" size={22} color="#F44336" />
+          </View>
+          <Text style={[profileStyles.rowLabel, { color: '#F44336' }]}>Delete Account</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
       </ScrollView>

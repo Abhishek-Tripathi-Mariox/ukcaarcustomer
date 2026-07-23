@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthNavigator } from './AuthNavigator';
@@ -52,6 +52,21 @@ export const AppNavigator: React.FC = () => {
 
   // User is authenticated but hasn't completed their profile yet
   const needsProfileCompletion = isAuthenticated && !isProfileSetup;
+
+  // Centralized session-end ejection. The root keeps MainApp mounted so the
+  // onboarding flow (which lives inside the Auth stack) can reset OUT to
+  // MainApp — which also means flipping isAuthenticated to false does NOT swap
+  // stacks by itself. Every path that ends a session — Log Out, Delete
+  // Account, or the 401→refresh interceptor giving up — sets isAuthenticated
+  // false; catch that transition here and reset to the (now-mounted) Auth
+  // stack, so no individual screen needs its own logout navigation.reset.
+  const wasAuthenticated = useRef(isAuthenticated);
+  useEffect(() => {
+    if (wasAuthenticated.current && !isAuthenticated && navigationRef.isReady()) {
+      navigationRef.reset({ index: 0, routes: [{ name: 'Auth' }] });
+    }
+    wasAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   return (
     <NavigationContainer

@@ -156,16 +156,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
                 {
                   text: 'OK',
                   onPress: () => {
-                    // Clear the session SYNCHRONOUSLY. The old code fired the
-                    // async logout thunk, which POSTs /auth/logout with a
-                    // now-deactivated token — if that hung or its state update
-                    // didn't apply, the user was left logged in on Settings.
-                    // forceLogout flips isAuthenticated immediately so the
-                    // root navigator swaps to the login stack right away.
+                    // forceLogout ends the session; AppNavigator's centralized
+                    // ejection effect resets to the Auth stack.
                     dispatch(forceLogout());
-                    // Best-effort background cleanup (tokens + FCM); its result
-                    // no longer gates the logout.
-                    authService.logout().catch(() => {});
+                    // Local-only cleanup (tokens + FCM). Skip the server logout
+                    // — the account is already deleted, so POST /auth/logout
+                    // would 401 and needlessly trip the refresh interceptor.
+                    authService.logout(false).catch(() => {});
                   },
                 },
               ],

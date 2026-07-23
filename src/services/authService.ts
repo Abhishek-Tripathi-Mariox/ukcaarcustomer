@@ -162,9 +162,12 @@ export const authService = {
     return data;
   },
 
-  logout: async () => {
+  // serverSide=false skips the POST /auth/logout call — used right after
+  // account deletion, where the token is already invalidated server-side so the
+  // call would 401 (and trip the global 401→refresh interceptor for nothing).
+  logout: async (serverSide = true) => {
     try {
-      await api.post('/auth/logout');
+      if (serverSide) await api.post('/auth/logout');
     } catch (err) {
       // The server-side logout is best-effort. If the token is already
       // invalid/expired (or the network is down), the call 401s/throws —

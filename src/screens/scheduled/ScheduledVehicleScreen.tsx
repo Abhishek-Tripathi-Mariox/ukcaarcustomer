@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { driverRatingText } from '@/utils/driverRating';
 import {
   View,
   Text,
@@ -149,7 +150,7 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
           <View style={styles.metaRow}>
             <Ionicons name="star" size={12} color={selectable ? '#F5A623' : '#C4C4C4'} />
             <Text style={[styles.metaText, !selectable && styles.mutedText]}>
-              {v.rating?.toFixed(1) ?? '5.0'}
+              {driverRatingText(v.rating)}
             </Text>
             <Text style={styles.metaDot}>·</Text>
             <Text

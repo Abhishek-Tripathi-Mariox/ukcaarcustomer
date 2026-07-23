@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { driverRatingText } from '@/utils/driverRating';
 import {
   View,
   Text,
@@ -408,7 +409,7 @@ export const ScheduledLiveTrackScreen: React.FC<Props> = ({ navigation, route })
           <Text style={styles.rowLabel}>Driver</Text>
           <Text style={styles.rowValue} numberOfLines={1}>
             {driverName}
-            {rating ? `  ★ ${Number(rating).toFixed(1)}` : ''}
+            {`  ★ ${driverRatingText(rating)}`}
           </Text>
         </View>
         {!!plate && (

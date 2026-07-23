@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { driverRatingText } from '@/utils/driverRating';
 import {
   View,
   Text,
@@ -436,7 +437,7 @@ const DriverCard: React.FC<{ status: BookingStatus | null; badge: string }> = ({
       <View style={{ flex: 1 }}>
         <Text style={styles.driverName}>{status?.driver?.name ?? 'Driver'}</Text>
         <Text style={styles.driverMeta}>
-          {status?.driver?.rating ? `★ ${Number(status.driver.rating).toFixed(1)}` : ''}
+          {`★ ${driverRatingText(status?.driver?.rating)}`}
           {status?.driver?.vehicle?.plateNumber ? `  ·  ${status.driver.vehicle.plateNumber}` : ''}
         </Text>
       </View>

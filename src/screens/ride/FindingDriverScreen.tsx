@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { driverDisplayRating } from '@/utils/driverRating';
 import {
   View,
   Text,
@@ -302,7 +303,7 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
               .filter(Boolean)
               .join(' ') || 'Driver',
           phone: driverInfo.phone ?? '',
-          rating: dp.rating ?? 5.0,
+          rating: driverDisplayRating(dp.rating),
           car: carBits || 'Vehicle',
           plate: dp.plateNumber ?? '',
           trips: dp.totalTrips ?? 0,
@@ -408,7 +409,7 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
           name:
             [driverInfo.firstName, driverInfo.lastName].filter(Boolean).join(' ') ||
             'Driver',
-          rating: dp.rating ?? 5.0,
+          rating: driverDisplayRating(dp.rating),
           car: carBits || 'Vehicle',
           plate: dp.plateNumber ?? '',
           trips: dp.totalTrips ?? 0,

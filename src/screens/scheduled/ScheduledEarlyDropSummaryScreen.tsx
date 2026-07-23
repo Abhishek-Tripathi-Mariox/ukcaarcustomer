@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { KeyboardAwareScrollView } from '@/components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow, alpha } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
@@ -162,7 +163,7 @@ export const ScheduledEarlyDropSummaryScreen: React.FC<Props> = ({ navigation, r
           <Text style={styles.headerTitle}>How Was Your Ride?</Text>
           <View style={styles.iconBtn} />
         </View>
-        <ScrollView contentContainerStyle={styles.content}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.content}>
           <Text style={styles.feedbackPrompt}>Rate your experience</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((n) => (
@@ -209,7 +210,7 @@ export const ScheduledEarlyDropSummaryScreen: React.FC<Props> = ({ navigation, r
             onChangeText={setComment}
             multiline
           />
-        </ScrollView>
+        </KeyboardAwareScrollView>
         <View style={[styles.footer, { paddingBottom: insets.bottom + vs(12) }]}>
           <TouchableOpacity
             style={[styles.primaryBtn, (stars < 1 || submitting) && { opacity: 0.5 }]}

@@ -165,7 +165,10 @@ export const OTPVerificationScreen: React.FC<OTPScreenProps> = ({
           navigation.getParent()?.reset({ index: 0, routes: [{ name: 'MainApp' }] });
         }
       } catch (e: any) {
-        setError(e?.message || 'Invalid OTP. Please try again.');
+        // unwrap() rethrows rejectWithValue's plain STRING — read it directly,
+        // else the server's real reason (suspended account, wrong app) is lost.
+        const msg = typeof e === 'string' ? e : e?.message;
+        setError(msg || 'Invalid OTP. Please try again.');
         Animated.sequence([
           Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
           Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
@@ -197,7 +200,8 @@ export const OTPVerificationScreen: React.FC<OTPScreenProps> = ({
       try {
         await dispatch(sendOtp({ phone, countryCode })).unwrap();
       } catch (e: any) {
-        setError(e?.message || 'Failed to resend OTP. Please try again.');
+        const msg = typeof e === 'string' ? e : e?.message;
+        setError(msg || 'Failed to resend OTP. Please try again.');
         setCanResend(true);
       }
     }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { driverDisplayRating, driverRatingText } from '@/utils/driverRating';
 import {
   View,
   Text,
@@ -139,7 +140,7 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
           id: String(d._id ?? ''),
           name: [d.firstName, d.lastName].filter(Boolean).join(' ') || 'Driver',
           phone: d.phone ?? '',
-          rating: dp.rating ?? 5,
+          rating: driverDisplayRating(dp.rating),
           car: carBits || 'Vehicle',
           plate: dp.plateNumber ?? '',
           trips: dp.totalTrips ?? 0,
@@ -216,7 +217,13 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
         driver,
       });
     } else if (status === 'cancelled' && rideId) {
-      navigation.replace('CancelRide', { rideId });
+          // Server-side cancel (driver/admin/auto). Do NOT push CancelRide —
+          // that is the "are you sure you want to cancel?" CONFIRMATION screen,
+          // and confirming there re-cancels an already-cancelled ride, which
+          // 400s and leaves the rider stuck with no way out.
+      dispatch(setCurrentRide(null));
+      Alert.alert('Ride cancelled', 'Your ride was cancelled.');
+      navigation.popToTop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
@@ -588,7 +595,7 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
           <View style={styles.driverInfo}>
             <Text style={styles.driverName}>{driver.name || 'Driver'}</Text>
             <Text style={styles.driverMeta}>
-              {(driver.rating ?? 5).toFixed(1)} {'⭐'} {'  |  '}{' '}
+              {driverRatingText(driver.rating)}{'  |  '}{' '}
               {driver.trips ?? 0}+ Rides
             </Text>
             {!!driver.phone && (

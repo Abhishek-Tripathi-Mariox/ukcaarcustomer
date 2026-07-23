@@ -35,9 +35,12 @@ const autoPng = require('../../../assets/select-ride/auto.png');
 interface SelectRideScreenProps {
   navigation: any;
   route: {
-    params: {
-      pickup: string;
-      dropoff: string;
+    // Optional: "Book Again" pushes this screen with no params at all and the
+    // addresses are read back from the ride slice instead.
+    params?: {
+      pickup?: string;
+      dropoff?: string;
+      bookingForName?: string;
     };
   };
 }
@@ -97,7 +100,14 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { pickup: pickupLoc, dropoff: dropoffLoc, estimateData, loading } =
     useAppSelector((s) => s.ride);
-  const { pickup, dropoff } = route.params;
+  // "Book Again" (RideDetails / ScheduledTripSummary) navigates here with NO
+  // params, so destructuring route.params directly threw "Cannot read property
+  // 'pickup' of undefined" and crashed the screen. Fall back to whatever the
+  // ride slice already holds.
+  const { pickup, dropoff } = {
+    pickup: route.params?.pickup ?? pickupLoc?.address ?? '',
+    dropoff: route.params?.dropoff ?? dropoffLoc?.address ?? '',
+  };
 
   // Single combined list of nearby vehicle types (instant + private merged).
   // The Instant/Private split was a backend convenience that didn't help the

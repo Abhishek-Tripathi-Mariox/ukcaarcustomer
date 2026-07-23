@@ -20,9 +20,11 @@ import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppSelector } from '@/store/hooks';
 import { safetyService } from '@/services/safetyService';
+import { appSettingsService, AppSettings } from '@/services/appSettingsService';
 
-const SAFETY_HELPLINE = '+911800123456';
-const SAFETY_GUIDELINES_URL = 'https://ukcaar.com/safety';
+// Helpline + guidelines now come from the admin panel (GET /settings/app).
+// They used to be these hardcoded literals, so the app dialled a placeholder
+// number and opened a URL the admin could never change.
 
 interface SafetyScreenProps {
   navigation: any;
@@ -45,6 +47,11 @@ export const SafetyScreen: React.FC<SafetyScreenProps> = ({ navigation }) => {
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [sosSending, setSosSending] = useState(false);
+  // Admin-configured helpline + guidelines URL.
+  const [settings, setSettings] = useState<AppSettings>(appSettingsService.peek());
+  useEffect(() => {
+    appSettingsService.get().then(setSettings).catch(() => {});
+  }, []);
 
   // Restore the saved "share ride details" preference.
   useEffect(() => {
@@ -106,15 +113,29 @@ export const SafetyScreen: React.FC<SafetyScreenProps> = ({ navigation }) => {
   };
 
   const callHelpline = () => {
-    Linking.openURL(`tel:${SAFETY_HELPLINE}`).catch(() =>
-      Alert.alert('Unable to call', `Please dial ${SAFETY_HELPLINE}`),
+    const num = (settings.safetyHelpline || settings.supportPhone || '').trim();
+    if (!num) {
+      Alert.alert(
+        'Helpline unavailable',
+        'No safety helpline is configured yet. Please contact support from Help & Support.',
+      );
+      return;
+    }
+    Linking.openURL(`tel:${num.replace(/\s/g, '')}`).catch(() =>
+      Alert.alert('Unable to call', `Please dial ${num}`),
     );
   };
 
   const openGuidelines = () => {
-    Linking.openURL(SAFETY_GUIDELINES_URL).catch(() =>
-      Alert.alert('Unable to open', SAFETY_GUIDELINES_URL),
-    );
+    const url = (settings.safetyGuidelinesUrl || '').trim();
+    if (!url) {
+      Alert.alert(
+        'Guidelines unavailable',
+        'Safety guidelines have not been published yet. Please check back soon.',
+      );
+      return;
+    }
+    Linking.openURL(url).catch(() => Alert.alert('Unable to open', url));
   };
 
   const showInsuranceInfo = () => {

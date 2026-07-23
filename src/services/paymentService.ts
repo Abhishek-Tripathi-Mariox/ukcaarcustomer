@@ -115,6 +115,17 @@ export const paymentService = {
     return data;
   },
 
+  /**
+   * Paginated wallet/transaction statement (newest first). Mirrors the
+   * backend GET /payments/wallet/statement: { items, pagination }.
+   */
+  getWalletStatement: async (page = 1, limit = 10) => {
+    const { data } = await api.get('/payments/wallet/statement', {
+      params: { page, limit },
+    });
+    return data;
+  },
+
   // Recharge offers (admin-defined denominations with bonus/discount)
   getRechargeOffers: async (): Promise<{ success: boolean; data: { offers: RechargeOffer[] } }> => {
     const { data } = await api.get('/payments/recharge-offers');

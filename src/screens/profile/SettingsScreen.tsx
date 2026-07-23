@@ -29,7 +29,7 @@ const TERMS_URL = 'https://ukcaar.com/terms';
 const PRIVACY_URL = 'https://ukcaar.com/privacy';
 const LICENSES_URL = 'https://ukcaar.com/licenses';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { logout } from '@/store/slices/authSlice';
+import { logout, forceLogout } from '@/store/slices/authSlice';
 
 interface SettingsScreenProps {
   navigation: any;
@@ -149,8 +149,27 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
               Alert.alert('Error', err?.response?.data?.message || 'Failed to delete account. Please try again.');
               return;
             }
-            // Account is deactivated server-side; clear the local session.
-            dispatch(logout());
+            Alert.alert(
+              'Account deleted',
+              'Your account has been deleted. You can sign up again with the same number any time.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // Clear the session SYNCHRONOUSLY. The old code fired the
+                    // async logout thunk, which POSTs /auth/logout with a
+                    // now-deactivated token — if that hung or its state update
+                    // didn't apply, the user was left logged in on Settings.
+                    // forceLogout flips isAuthenticated immediately so the
+                    // root navigator swaps to the login stack right away.
+                    dispatch(forceLogout());
+                    // Best-effort background cleanup (tokens + FCM); its result
+                    // no longer gates the logout.
+                    authService.logout().catch(() => {});
+                  },
+                },
+              ],
+            );
           },
         },
       ],

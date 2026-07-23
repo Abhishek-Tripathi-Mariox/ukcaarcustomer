@@ -66,6 +66,26 @@ export interface Ride {
   discount: number;
   tip?: number;
   paymentMethod: string;
+  /** Server payment state. The API always sent this, but the client type
+   *  omitted it — so the UI invented money facts (e.g. a "refunded" line
+   *  computed from the fare) instead of reading the truth. */
+  paymentStatus?: 'pending' | 'completed' | 'refunded' | 'failed';
+  /** Ratings given for this ride, if any. */
+  rating?: {
+    customerToDriver?: number;
+    driverToCustomer?: number;
+    customerComment?: string;
+    driverComment?: string;
+    tags?: string[];
+  };
+  /** Cancellation record — who, why, fee charged and money returned. */
+  cancellation?: {
+    cancelledBy?: 'customer' | 'driver' | 'admin' | 'system';
+    reason?: string;
+    fee?: number;
+    refundAmount?: number;
+    cancelledAt?: string;
+  };
   pickupOtp?: string;
   driver?: any;
   createdAt: string;

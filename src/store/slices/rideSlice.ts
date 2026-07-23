@@ -102,6 +102,11 @@ const rideSlice = createSlice({
   reducers: {
     setPickup: (state, action: PayloadAction<Location>) => { state.pickup = action.payload; },
     setDropoff: (state, action: PayloadAction<Location>) => { state.dropoff = action.payload; },
+    // Per-field clears. Emptying an address input has to drop the stored
+    // location too — otherwise the text reappears the moment the field loses
+    // focus and the ride books against an address the rider already deleted.
+    clearPickup: (state) => { state.pickup = null; state.estimateData = null; },
+    clearDropoff: (state) => { state.dropoff = null; state.estimateData = null; },
     setRideType: (state, action: PayloadAction<RideType>) => { state.rideType = action.payload; },
     setSelectedVehicle: (state, action: PayloadAction<string>) => { state.selectedVehicle = action.payload; },
     setCurrentRide: (state, action: PayloadAction<Ride | null>) => { state.currentRide = action.payload; },
@@ -159,6 +164,8 @@ export const {
   setRideType,
   setSelectedVehicle,
   setCurrentRide,
+  clearPickup,
+  clearDropoff,
   clearRide,
   clearError,
 } = rideSlice.actions;

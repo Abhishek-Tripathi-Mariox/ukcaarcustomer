@@ -6,19 +6,14 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
-import { TargetIcon } from '@/components/icons/HomeIcons';
 import { routeService, type ScheduledRouteApi } from '@/services/routeService';
 import { geoService } from '@/services/geoService';
-
-const pickupGif = require('../../../assets/home-screen/gifs/charging-station.gif');
-const dropGif = require('../../../assets/home-screen/gifs/location.gif');
 
 interface ScheduledRouteScreenProps {
   navigation: any;
@@ -201,44 +196,51 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      {/* Dark icons — the header bar is white now, light-content was invisible. */}
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
-      {/* Header */}
+      {/* Header — matches Plan your ride (light bar, dark back arrow). */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.white} />
+          <Ionicons name="arrow-back" size={23} color="#1D262D" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Select Route</Text>
         <View style={{ width: 32 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Pickup */}
-        <View style={styles.inputWrapper}>
-          <Text style={styles.inputFloatLabel}>Pickup location</Text>
-          <View style={[styles.inputContainer, styles.inputContainerActive]}>
-            <View style={styles.inputIconCircle}>
-              <Image source={pickupGif} style={styles.inputIconImage} resizeMode="contain" />
+        {/* Trip summary in the same combined box used on Plan your ride —
+            read-only here; tapping it goes back so the rider can edit the
+            stops that drive this route search. */}
+        <TouchableOpacity
+          style={styles.comboBox}
+          activeOpacity={0.85}
+          onPress={() => navigation.goBack()}
+        >
+          <View style={styles.comboRow}>
+            <View style={styles.comboIconCol}>
+              <View style={styles.dotOuter}><View style={styles.dotInner} /></View>
             </View>
-            <Text style={styles.inputValue} numberOfLines={1}>{pickup}</Text>
-            <TouchableOpacity style={styles.gpsButton}>
-              <TargetIcon size={24} color={Colors.primary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Dropoff */}
-        <View style={styles.inputWrapper}>
-          <Text style={styles.inputFloatLabel}>Where to?</Text>
-          <View style={styles.inputContainer}>
-            <View style={[styles.inputIconCircle, { backgroundColor: 'transparent' }]}>
-              <Image source={dropGif} style={styles.inputIconImage} resizeMode="contain" />
-            </View>
-            <Text style={styles.inputPlaceholder} numberOfLines={1}>
-              {dropoff || 'Where is your Drop?'}
+            <Text style={styles.comboText} numberOfLines={1}>
+              {pickup || 'Pickup location'}
             </Text>
           </View>
-        </View>
+
+          <View style={styles.comboDivider} />
+
+          <View style={styles.comboRow}>
+            <View style={styles.comboIconCol}>
+              <View style={styles.squareIcon} />
+            </View>
+            <Text
+              style={[styles.comboText, !dropoff && styles.comboPlaceholder]}
+              numberOfLines={1}
+            >
+              {dropoff || 'Where to?'}
+            </Text>
+            <Ionicons name="create-outline" size={17} color="#9CA3AF" />
+          </View>
+        </TouchableOpacity>
 
         {/* Routes \u2014 loading / empty / error states */}
         {routes === null && !loadError && (
@@ -362,65 +364,57 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: s(16),
-    paddingVertical: vs(14),
+    paddingVertical: vs(12),
   },
-  backBtn: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: s(32), height: s(32), alignItems: 'flex-start', justifyContent: 'center' },
   headerTitle: {
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(18),
-    color: Colors.white,
+    color: '#1D262D',
   },
   content: { padding: s(16), paddingBottom: vs(120) },
 
-  inputWrapper: { marginBottom: vs(14), position: 'relative', paddingTop: vs(8) },
-  inputFloatLabel: {
-    position: 'absolute',
-    top: 0,
-    left: s(20),
-    zIndex: 2,
-    backgroundColor: Colors.white,
-    paddingHorizontal: s(8),
-    fontFamily: 'Inter-Medium',
-    fontSize: fs(14),
-    color: Colors.textSecondary,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: s(14),
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: s(14),
-    height: vs(60),
-    gap: s(10),
-    ...Shadow.sm,
-  },
-  inputContainerActive: { borderColor: Colors.primary },
-  inputIconCircle: {
-    width: s(40),
-    height: s(40),
-    borderRadius: s(20),
-    alignItems: 'center',
-    justifyContent: 'center',
+  /* Trip summary box — mirrors the combined pickup/drop box on Plan your ride
+     so the two screens read as one flow. */
+  comboBox: {
+    borderWidth: 1.5,
+    borderColor: '#1D262D',
+    borderRadius: s(12),
+    paddingVertical: vs(4),
+    marginBottom: vs(16),
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
-  inputIconImage: { width: s(40), height: s(40) },
-  inputValue: {
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(14),
-    color: Colors.textSecondary,
-    flex: 1,
+  comboRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: s(12),
+    paddingVertical: vs(13),
+    gap: s(4),
   },
-  inputPlaceholder: {
-    fontFamily: 'Inter-Regular',
-    fontSize: fs(14),
-    color: Colors.textMuted,
-    flex: 1,
+  comboIconCol: { width: s(30), alignItems: 'center' },
+  dotOuter: {
+    width: s(16),
+    height: s(16),
+    borderRadius: s(8),
+    borderWidth: 1.5,
+    borderColor: '#1D262D',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  gpsButton: { width: s(32), height: s(32), alignItems: 'center', justifyContent: 'center' },
+  dotInner: { width: s(7), height: s(7), borderRadius: s(3.5), backgroundColor: '#1D262D' },
+  squareIcon: { width: s(13), height: s(13), borderRadius: s(2), backgroundColor: '#1D262D' },
+  comboDivider: { height: 1, backgroundColor: '#E5E7EB', marginLeft: s(42) },
+  comboText: {
+    flex: 1,
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(14.5),
+    color: '#1D262D',
+  },
+  comboPlaceholder: { color: '#9CA3AF' },
+
 
   routeCard: {
     backgroundColor: Colors.white,

@@ -7,6 +7,7 @@ import {
   Modal,
   Pressable,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -94,6 +95,8 @@ export const BookingRideForSheet: React.FC<BookingRideForSheetProps> = ({
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
+        {/* Lift the sheet above the keyboard while typing a rider's name. */}
+        <KeyboardAvoidingView behavior="padding">
         <View style={[styles.sheet, { paddingBottom: insets.bottom + vs(24) }]}>
           <Text style={styles.title}>Booking ride for</Text>
 
@@ -192,6 +195,7 @@ export const BookingRideForSheet: React.FC<BookingRideForSheetProps> = ({
             <Text style={styles.doneText}>Done</Text>
           </TouchableOpacity>
         </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

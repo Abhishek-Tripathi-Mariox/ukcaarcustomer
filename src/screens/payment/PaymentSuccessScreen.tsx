@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { driverRatingText } from '@/utils/driverRating';
 import {
   View,
   Text,
@@ -85,7 +86,14 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
     rideService
       .getRide(rideId)
       .then((r) => {
-        if (!cancelled) setRide(r);
+        if (cancelled) return;
+        setRide(r);
+        // Already rated (e.g. rated from RideComplete, then paid, or the user
+        // re-landed here) — don't reopen the sheet at 0 stars asking again;
+        // the backend now rejects re-rating anyway.
+        if (Number((r as any)?.rating?.customerToDriver ?? 0) > 0) {
+          setRatingVisible(false);
+        }
       })
       .catch(() => {});
     return () => {
@@ -388,11 +396,7 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
             : undefined
         }
         driverAvatar={ride?.driver?.avatar ?? undefined}
-        driverRating={
-          ride?.driver?.driverProfile?.rating
-            ? String(ride.driver.driverProfile.rating)
-            : undefined
-        }
+        driverRating={driverRatingText(ride?.driver?.driverProfile?.rating)}
       />
 
       {/* Invoice modal — renders the same HTML the rider would see in the

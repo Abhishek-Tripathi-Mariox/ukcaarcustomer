@@ -7,7 +7,12 @@
     <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
     <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     <item name="android:statusBarColor">@android:color/transparent</item>
-    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <!-- Opaque navigation bar. Transparent made the app draw BEHIND the
+         system bar, so on 3-button-nav phones the OS buttons sat on top of
+         any screen whose bottom CTA didn't add safe-area padding. Opaque
+         means the system reserves that strip and every screen clears it. -->
+    <item name="android:navigationBarColor">@android:color/white</item>
+    <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
     <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
   </style>
   <style name="ResetEditText" parent="@android:style/Widget.EditText">

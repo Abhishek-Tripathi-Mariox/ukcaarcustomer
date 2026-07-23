@@ -150,7 +150,12 @@ export const InRideScreen: React.FC<InRideScreenProps> = ({
         driver,
       });
     } else if (currentRide.status === 'cancelled') {
-      navigation.replace('CancelRide', { rideId });
+          // Server-side cancel (driver/admin/auto). Do NOT push CancelRide —
+          // that is the "are you sure you want to cancel?" CONFIRMATION screen,
+          // and confirming there re-cancels an already-cancelled ride, which
+          // 400s and leaves the rider stuck with no way out.
+      Alert.alert('Ride cancelled', 'Your ride was cancelled.');
+      navigation.popToTop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRide?.status, currentRide?._id]);
@@ -185,7 +190,12 @@ export const InRideScreen: React.FC<InRideScreenProps> = ({
           });
         } else if (ride.status === 'cancelled') {
           navigatedRef.current = true;
-          navigation.replace('CancelRide', { rideId });
+          // Server-side cancel (driver/admin/auto). Do NOT push CancelRide —
+          // that is the "are you sure you want to cancel?" CONFIRMATION screen,
+          // and confirming there re-cancels an already-cancelled ride, which
+          // 400s and leaves the rider stuck with no way out.
+          Alert.alert('Ride cancelled', 'Your ride was cancelled.');
+          navigation.popToTop();
         }
       } catch {
         /* transient network error — the next tick retries */

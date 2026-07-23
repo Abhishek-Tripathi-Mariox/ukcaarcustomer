@@ -54,6 +54,10 @@ interface PickupPickerSheetProps {
     lng: number;
     pincode?: string;
   }) => void;
+  /** Fired when the rider chooses "Set location on map". The caller closes
+   *  this sheet and pushes SelectLocation in pick-from-map mode — the sheet
+   *  itself has no navigation object. */
+  onPickOnMap?: () => void;
 }
 
 interface PickerRow {
@@ -62,7 +66,7 @@ interface PickerRow {
   address: string;
   /** Drives the row icon. 'gps' = the "Use current location" shortcut,
    *  'saved' = an address book entry, 'search' = a live autocomplete hit. */
-  source: 'gps' | 'saved' | 'search';
+  source: 'gps' | 'saved' | 'search' | 'map';
   icon?: string;
   lat: number;
   lng: number;
@@ -84,6 +88,7 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
   liveAddress,
   mode = 'pickup',
   onPicked,
+  onPickOnMap,
 }) => {
   const isPickup = mode === 'pickup';
   const insets = useSafeAreaInsets();
@@ -132,6 +137,20 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
         lng: liveCoords.lng,
       });
     }
+    // Drop a pin manually — for places autocomplete can't name (a gate, a
+    // field entrance, an unmarked building). Sits above the address book so
+    // it reads as a peer of "use current location".
+    if (onPickOnMap) {
+      rows.push({
+        id: 'map',
+        title: 'Set location on map',
+        address: 'Drop a pin at the exact spot',
+        source: 'map',
+        icon: 'map-outline',
+        lat: 0,
+        lng: 0,
+      });
+    }
     for (const a of savedAddresses) {
       if (!a.address || (a.lat === 0 && a.lng === 0)) continue;
       rows.push({
@@ -145,7 +164,7 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
       });
     }
     return rows;
-  }, [isPickup, liveCoords?.lat, liveCoords?.lng, liveAddress, savedAddresses]);
+  }, [isPickup, liveCoords?.lat, liveCoords?.lng, liveAddress, savedAddresses, onPickOnMap]);
 
   // Run autocomplete on debounce when the user types. We bias the search
   // to a 10 km radius around the rider so the dropdown surfaces places
@@ -203,6 +222,13 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
   const data = query.trim().length >= 2 ? results : idleSuggestions;
 
   const choose = (row: PickerRow) => {
+    // "Set location on map" isn't an address — hand off to the caller so it
+    // can push the map picker, and don't dispatch the placeholder 0,0 coords.
+    if (row.source === 'map') {
+      onClose();
+      onPickOnMap?.();
+      return;
+    }
     const loc = {
       address: row.address,
       lat: row.lat,
@@ -295,14 +321,15 @@ export const PickupPickerSheet: React.FC<PickupPickerSheetProps> = ({
                 <View
                   style={[
                     styles.rowIcon,
-                    item.source === 'gps' && styles.rowIconAccent,
+                    (item.source === 'gps' || item.source === 'map') &&
+                      styles.rowIconAccent,
                   ]}
                 >
                   <Ionicons
                     name={(item.icon as any) || 'location'}
                     size={s(18)}
                     color={
-                      item.source === 'gps'
+                      item.source === 'gps' || item.source === 'map'
                         ? Colors.white
                         : Colors.textSecondary
                     }

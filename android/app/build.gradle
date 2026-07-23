@@ -36,8 +36,8 @@ android {
         applicationId 'com.ukcaar.customer'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 2
+        versionName "1.0.1"
     }
     signingConfigs {
         debug {
@@ -50,6 +50,12 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            // Pin the customer DEBUG app's Metro port to 8082 so it can run
+            // alongside the driver app (which keeps the default 8081). Both
+            // debug apps used to fight over localhost:8081 — whichever
+            // project's Metro owned the port fed its bundle to BOTH apps,
+            // red-screening the other on any cold start.
+            resValue "integer", "react_native_dev_server_port", "8082"
         }
         release {
             // Caution! In production, you need to generate your own keystore file.

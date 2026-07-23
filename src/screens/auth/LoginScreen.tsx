@@ -44,7 +44,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         countryCode,
       });
     } catch (e: any) {
-      setError(e?.message || 'Failed to send OTP. Please try again.');
+      // rejectWithValue() throws the message as a plain STRING, so `e.message`
+      // is undefined and the real reason (e.g. "This number is registered as a
+      // driver — use the Driver app") was being swallowed by the generic text.
+      const msg = typeof e === 'string' ? e : e?.message;
+      setError(msg || 'Failed to send OTP. Please try again.');
     }
   };
 

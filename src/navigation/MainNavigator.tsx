@@ -9,6 +9,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout, fetchProfile } from '@/store/slices/authSlice';
 import { setWalletBalance } from '@/store/slices/appSlice';
 import { paymentService } from '@/services/paymentService';
+import { appSettingsService } from '@/services/appSettingsService';
 import {
   UserIcon,
   BellIcon,
@@ -26,7 +27,7 @@ import {
 import { SecuredShieldIcon } from '@/components/icons/PaymentOptionIcons';
 import { HomeGlyphIcon } from '@/components/icons/TabBarIcons';
 
-import { HomeScreen } from '@/screens/home';
+import { HomeScreen, PlanRideScreen, PickOnMapScreen } from '@/screens/home';
 import {
   SearchRideScreen,
   SelectLocationScreen,
@@ -80,13 +81,23 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const [pushNotifications, setPushNotifications] = useState(true);
   const [promoNotifications, setPromoNotifications] = useState(true);
+  // Referral blurb comes from the admin panel. It used to be the hardcoded
+  // "Get ₹10 for reffering friends" here while Refer & Earn promised ₹400 —
+  // two different made-up numbers, neither matching the configured bonus.
+  const [referralBonus, setReferralBonus] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(fetchProfile());
     paymentService.getWallet().then((res) => {
       if (res.success) dispatch(setWalletBalance(res.data.wallet?.balance || 0));
     }).catch(() => {});
+    appSettingsService.get().then((s) => setReferralBonus(s.referrerRewardCustomer)).catch(() => {});
   }, [dispatch]);
+
+  const referralBlurb =
+    referralBonus && referralBonus > 0
+      ? `Get ₹${referralBonus} for referring friends`
+      : 'Invite friends and earn rewards';
 
   const handleLogout = () => {
     Alert.alert(
@@ -172,8 +183,8 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('EditProfile')}
           activeOpacity={0.7}
         >
-          <UserIcon size={24} color={Colors.primary} />
-          <Text style={profileStyles.rowLabel}>Update User Profile</Text>
+          <View style={profileStyles.rowIcon}><UserIcon size={22} color={Colors.primary} /></View>
+          <Text style={profileStyles.rowLabel}>Update Profile</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
 
@@ -182,7 +193,7 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Notifications')}
           activeOpacity={0.7}
         >
-          <BellIcon size={24} color={Colors.primary} />
+          <View style={profileStyles.rowIcon}><BellIcon size={22} color={Colors.primary} /></View>
           <Text style={profileStyles.rowLabel}>Notification</Text>
           <Text style={profileStyles.rowAllow}>Allow</Text>
         </TouchableOpacity>
@@ -192,8 +203,10 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Payment')}
           activeOpacity={0.7}
         >
-          <SavePaymentIcon size={20} color={Colors.primary} />
-          <Text style={[profileStyles.rowLabel, { marginLeft: 14 }]}>Save Payment Method</Text>
+          <View style={profileStyles.rowIcon}>
+            <Ionicons name="card-outline" size={22} color={Colors.primary} />
+          </View>
+          <Text style={profileStyles.rowLabel}>Payment Method</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
 
@@ -202,7 +215,7 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('SavedAddresses')}
           activeOpacity={0.7}
         >
-          <HistoryIcon size={24} color={Colors.primary} />
+          <View style={profileStyles.rowIcon}><HistoryIcon size={22} color={Colors.primary} /></View>
           <Text style={profileStyles.rowLabel}>Saved Address</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
@@ -212,7 +225,7 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Activity')}
           activeOpacity={0.7}
         >
-          <HistoryIcon size={24} color={Colors.primary} />
+          <View style={profileStyles.rowIcon}><HistoryIcon size={22} color={Colors.primary} /></View>
           <Text style={profileStyles.rowLabel}>Ride History</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
@@ -222,8 +235,8 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Safety')}
           activeOpacity={0.7}
         >
-          <SecuredShieldIcon size={22} />
-          <Text style={[profileStyles.rowLabel, { marginLeft: 14 }]}>Safety</Text>
+          <View style={profileStyles.rowIcon}><SecuredShieldIcon size={22} /></View>
+          <Text style={profileStyles.rowLabel}>Safety</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
 
@@ -232,7 +245,7 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('HelpSupport')}
           activeOpacity={0.7}
         >
-          <SettingsIcon size={24} color={Colors.primary} />
+          <View style={profileStyles.rowIcon}><SettingsIcon size={22} color={Colors.primary} /></View>
           <Text style={profileStyles.rowLabel}>Help & Support</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
@@ -242,8 +255,8 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Loyalty')}
           activeOpacity={0.7}
         >
-          <SecuredShieldIcon size={20} />
-          <Text style={[profileStyles.rowLabel, { marginLeft: 14 }]}>Rewards & Points</Text>
+          <View style={profileStyles.rowIcon}><SecuredShieldIcon size={22} /></View>
+          <Text style={profileStyles.rowLabel}>Rewards & Points</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
 
@@ -252,10 +265,10 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('ReferEarn')}
           activeOpacity={0.7}
         >
-          <ShareBoxIcon size={20} color={Colors.primary} />
+          <View style={profileStyles.rowIcon}><ShareBoxIcon size={22} color={Colors.primary} /></View>
           <View style={profileStyles.rowTextWrap}>
             <Text style={[profileStyles.rowLabel, profileStyles.rowLabelTight]}>Refer to Friends</Text>
-            <Text style={profileStyles.rowSubLabel}>Get ₹10 for reffering friends</Text>
+            <Text style={profileStyles.rowSubLabel}>{referralBlurb}</Text>
           </View>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
@@ -288,36 +301,16 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         {/* MORE */}
         <Text style={[profileStyles.sectionTitle, { marginTop: 24 }]}>MORE</Text>
 
-        <TouchableOpacity
-          style={profileStyles.row}
-          onPress={() => navigation.navigate('Settings')}
-          activeOpacity={0.7}
-        >
-          <SettingsIcon size={24} color={Colors.primary} />
-          <Text style={profileStyles.rowLabel}>Settings</Text>
-          <ChevronRightIcon size={24} color="#6B7280" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={profileStyles.row}
-          onPress={() => navigation.navigate('HelpSupport')}
-          activeOpacity={0.7}
-        >
-          <PhoneIcon size={22} color="#1B1D21" />
-          <View style={profileStyles.rowTextWrap}>
-            <Text style={profileStyles.toggleLabel}>Contact Us</Text>
-            <Text style={profileStyles.rowSubLabel}>For more information</Text>
-          </View>
-          <ChevronRightIcon size={24} color="#6B7280" />
-        </TouchableOpacity>
+        {/* "Contact Us" removed — it navigated to the SAME HelpSupport
+            screen as the Help & Support row above, so it was a duplicate. */}
 
         <TouchableOpacity
           style={profileStyles.row}
           onPress={handleLogout}
           activeOpacity={0.7}
         >
-          <LogoutIcon size={22} color="#1B1D21" />
-          <Text style={[profileStyles.rowLabel, { marginLeft: 14 }]}>Logout</Text>
+          <View style={profileStyles.rowIcon}><LogoutIcon size={22} color="#1B1D21" /></View>
+          <Text style={profileStyles.rowLabel}>Logout</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
       </ScrollView>
@@ -423,6 +416,14 @@ const profileStyles = StyleSheet.create({
   },
   rowTextWrap: {
     flex: 1,
+  },
+  // Fixed-width icon column. Icons range 20-24px, so without this the labels
+  // started at a different x on every row and the list looked ragged; the old
+  // fix was a per-row marginLeft patch on some rows but not others.
+  rowIcon: {
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowLabel: {
     flex: 1,
@@ -556,6 +557,8 @@ export const MainNavigator: React.FC = () => {
       <Stack.Screen name="MainTabs" component={TabNavigator} />
       <Stack.Screen name="SearchRide" component={SearchRideScreen} />
       <Stack.Screen name="SelectLocation" component={SelectLocationScreen} />
+      <Stack.Screen name="PlanRide" component={PlanRideScreen} />
+      <Stack.Screen name="PickOnMap" component={PickOnMapScreen} />
       <Stack.Screen name="SelectRide" component={SelectRideScreen} />
       <Stack.Screen
         name="FindingDriver"

@@ -29,6 +29,7 @@ import Svg, {
 } from 'react-native-svg';
 import { BackArrowIcon } from '@/components/icons/ProfileIcons';
 import { authService } from '@/services/authService';
+import { appSettingsService } from '@/services/appSettingsService';
 
 const whatsappIcon = require('../../../assets/refer-earn/whatsapp.png');
 const facebookIcon = require('../../../assets/refer-earn/facebook.png');
@@ -39,8 +40,13 @@ interface ReferEarnScreenProps {
   navigation: any;
 }
 
-const buildReferralMessage = (code: string) =>
-  `Hey! Book your rides with UKCAAR and get up to ₹400 bonus. Use my referral code: ${code}`;
+// The bonus is admin-configured. It used to be hardcoded "₹400" here while the
+// Account row promised "₹10" — two invented numbers, neither matching the
+// referralBonus the admin actually set.
+const buildReferralMessage = (code: string, bonus: number) =>
+  bonus > 0
+    ? `Hey! Book your rides with UKCAAR and get ₹${bonus} bonus. Use my referral code: ${code}`
+    : `Hey! Book your rides with UKCAAR. Use my referral code: ${code}`;
 
 // Three-step illustration: person meditating → phone (recharge) → wallet with coins
 const ReferIllustration: React.FC = () => (
@@ -160,6 +166,23 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
   const [enteredCode, setEnteredCode] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [referralCount, setReferralCount] = useState(0);
+  const [referrerReward, setReferrerReward] = useState(
+    appSettingsService.peek().referrerRewardCustomer,
+  );
+  const [joinerBonus, setJoinerBonus] = useState(
+    appSettingsService.peek().referralBonus,
+  );
+  useEffect(() => {
+    // force=true: always show the CURRENT admin-configured amounts when the
+    // rider opens this screen, never a session-stale value.
+    appSettingsService
+      .get(true)
+      .then((cfg) => {
+        setReferrerReward(cfg.referrerRewardCustomer);
+        setJoinerBonus(cfg.referralBonus);
+      })
+      .catch(() => {});
+  }, []);
 
   // Pull the real referral code + count from /auth/me. The backend
   // auto-generates a unique referralCode per user and reports how many
@@ -183,7 +206,7 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
     };
   }, []);
 
-  const referralMessage = buildReferralMessage(referralCode);
+  const referralMessage = buildReferralMessage(referralCode, referrerReward);
 
   const openCodeModal = () => {
     setEnteredCode('');
@@ -278,7 +301,14 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>
-          Invite your Friend and Earn <Text style={styles.titleBold}>₹400</Text>
+          {referrerReward > 0 ? (
+            <>
+              Invite your Friend and Earn{' '}
+              <Text style={styles.titleBold}>₹{referrerReward}</Text>
+            </>
+          ) : (
+            'Invite your Friend and Earn Rewards'
+          )}
         </Text>
         <Text style={styles.subtitle}>
           {referralCount > 0
@@ -291,8 +321,10 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
           <ReferIllustration />
           <View style={styles.illustrationLabels}>
             <Text style={styles.stepLabel}>{'Invite your\nFriend'}</Text>
-            <Text style={styles.stepLabel}>{'Friend does\nRecharge'}</Text>
-            <Text style={styles.stepLabel}>{'You get Up to\n₹400'}</Text>
+            <Text style={styles.stepLabel}>{'Friend takes\ntheir first ride'}</Text>
+            <Text style={styles.stepLabel}>
+              {referrerReward > 0 ? 'You get\n₹' + String(referrerReward) : 'You earn\nrewards'}
+            </Text>
           </View>
         </View>
 
@@ -315,8 +347,9 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
 
         {/* Share prompt */}
         <Text style={styles.sharePrompt}>
-          Share your referral code and get a{'\n'}
-          bonus up to ₹400
+          {referrerReward > 0
+            ? 'Share your referral code and earn ₹' + String(referrerReward) + ' when your friend takes their first ride'
+            : 'Share your referral code and earn rewards when your friend takes their first ride'}
         </Text>
 
         {/* Social icons row */}
@@ -392,8 +425,16 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
             </View>
 
             <Text style={styles.modalDesc}>
-              Enter the referral code received and{'\n'}
-              instantly get <Text style={styles.modalDescBold}>₹400</Text> in your UKCAAR Wallet.
+              {joinerBonus > 0 ? (
+                <>
+                  Enter the referral code received and{'\n'}
+                  instantly get{' '}
+                  <Text style={styles.modalDescBold}>₹{joinerBonus}</Text> in
+                  your UKCAAR Wallet.
+                </>
+              ) : (
+                'Enter the referral code you received to link your account.'
+              )}
             </Text>
 
             <TouchableOpacity

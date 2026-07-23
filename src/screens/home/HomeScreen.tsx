@@ -20,31 +20,18 @@ import { useDefaultPickup } from '@/hooks/useDefaultPickup';
 import { Colors, Typography, Spacing, BorderRadius, Shadow } from '@/theme';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setWalletBalance, refreshNotificationCount } from '@/store/slices/appSlice';
-import { setRideType, setPickup, setDropoff } from '@/store/slices/rideSlice';
+import { setRideType } from '@/store/slices/rideSlice';
 import { paymentService } from '@/services/paymentService';
 import { driverService, NearbyDriver } from '@/services/driverService';
 import { rideService } from '@/services/rideService';
-import { routeService } from '@/services/routeService';
-import { geoService } from '@/services/geoService';
-import {
-  routeToUi,
-  type ScheduledRoute,
-} from '@/screens/scheduled/ScheduledRouteScreen';
 import {
   SunriseIcon,
-  TargetIcon,
   FlashIcon,
   CarIcon,
   CalendarClockIcon,
   CabIcon,
-  MenuIcon,
 } from '@/components/icons/HomeIcons';
-import { BookingRideForSheet } from './BookingRideForSheet';
-import { PickupPickerSheet } from './PickupPickerSheet';
 import { LocationRequiredBanner } from '@/components/LocationRequiredBanner';
-
-const pickupGif = require('../../../assets/home-screen/gifs/charging-station.gif');
-const dropGif = require('../../../assets/home-screen/gifs/location.gif');
 
 const { height } = Dimensions.get('window');
 
@@ -58,37 +45,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const headerHeight = insets.top + 70;
   const [activeTab, setActiveTab] = useState<RideTab>('instant');
-  const [showRiderSheet, setShowRiderSheet] = useState(false);
-  // Inline pickup picker — replaces the old SelectLocation full-screen
-  // navigation so the rider stays on Home throughout the booking flow.
-  const [showPickupPicker, setShowPickupPicker] = useState(false);
-  // Scheduled tab uses the same picker sheet for its drop field so the
-  // user gets live autocomplete (geo/autocomplete proxy) and saved
-  // addresses — same wiring as Instant/Private. Without this the field
-  // was a bare TextInput and the rider had to type the full address by
-  // hand, then ScheduledRouteScreen geocoded the raw string.
-  const [showDropPicker, setShowDropPicker] = useState(false);
-  // Scheduled routes resolved against the chosen pickup/drop — shown
-  // inline on the Scheduled tab so the rider never has to bounce to a
-  // separate ScheduledRoute screen just to pick one. Tapping "Schedule
-  // Ride" jumps straight to ScheduledBoardingDrop with the selected row.
-  const [scheduledRoutes, setScheduledRoutes] = useState<ScheduledRoute[] | null>(null);
-  const [scheduledRoutesError, setScheduledRoutesError] = useState<string | null>(null);
-  const [selectedScheduledRouteId, setSelectedScheduledRouteId] = useState<string | null>(null);
-  // Pincodes captured from the picker sheet. These drive the primary
-  // matching path on the scheduled-routes endpoint — pure lat/lng rarely
-  // hits a route stop exactly (the rider may be a few km from the
-  // departure point), but a matching PIN reliably says "this route serves
-  // your town/area".
-  const [scheduledPickupPincode, setScheduledPickupPincode] = useState<string | undefined>();
-  const [scheduledDropPincode, setScheduledDropPincode] = useState<string | undefined>();
-  // Pincode of the rider's *current* GPS location. Used as the default
-  // proximity filter on the Scheduled tab so the rider only sees routes
-  // serving their area, even before they set a pickup. The picker-supplied
-  // scheduledPickupPincode overrides this once they explicitly pick a pickup.
-  const [currentPincode, setCurrentPincode] = useState<string | undefined>();
-  const [scheduledPickup, setScheduledPickup] = useState('');
-  const [scheduledDrop, setScheduledDrop] = useState('');
+  // Home no longer collects any trip input — pickup, drop, rider and the
+  // scheduled-route lookup all live in PlanRideScreen / ScheduledRouteScreen
+  // now. What's left here is the live cab map, the tabs, and promotions.
   const { user } = useAppSelector((state) => state.auth);
   const reduxPickup = useAppSelector((state) => state.ride.pickup);
   const reduxDropoff = useAppSelector((state) => state.ride.dropoff);
@@ -112,6 +71,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   useEffect(() => {
     dispatch(setRideType(activeTab));
   }, [activeTab, dispatch]);
+
+  // Best recharge offer for the promo rail at the bottom of the sheet.
+  // Admin-defined (same source as the WalletTopUp screen), so the banner
+  // is real promotional content, not a static placeholder.
+  const [promoOffer, setPromoOffer] = useState<{
+    amount: number;
+    bonusAmount?: number;
+    label?: string;
+  } | null>(null);
+  useEffect(() => {
+    paymentService
+      .getRechargeOffers()
+      .then((res) => {
+        const offers = res?.data?.offers ?? [];
+        // Pick the offer with the biggest bonus to headline the banner.
+        const best = [...offers].sort(
+          (a: any, b: any) => (b.bonusAmount ?? 0) - (a.bonusAmount ?? 0),
+        )[0];
+        setPromoOffer(best ?? null);
+      })
+      .catch(() => {});
+  }, []);
 
   // ── Live nearby drivers for the map ─────────────────────────────
   // Center coords come from the geolocation slice (resolved on the splash
@@ -177,26 +158,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     ? userCoords
     : null;
 
-  // Resolve the current location's pincode so the Scheduled tab can filter
-  // routes to the rider's area. useLiveLocation only keeps the address
-  // string, so we reverse-geocode the coords ourselves for the parts.
-  // Resolved once per fix (we early-return once we have one) to avoid
-  // hammering the geocoder as watchPosition streams tiny coordinate deltas.
-  useEffect(() => {
-    if (!effectiveCenter || currentPincode) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await geoService.reverse(effectiveCenter.lat, effectiveCenter.lng);
-        if (!cancelled && res?.parts?.pincode) setCurrentPincode(res.parts.pincode);
-      } catch {
-        /* leave currentPincode unset — fetch falls back to coords ranking */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveCenter?.lat, effectiveCenter?.lng, currentPincode]);
 
   // Default-pickup resolver. Reads from the single `live` instance above
   // plus the user's saved addresses.
@@ -205,88 +166,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     address: live.address,
   });
 
-  // Default the Scheduled-tab pickup field to the resolved default location
-  // (live GPS → primary saved → first saved) — only while the field is empty
-  // so we never clobber what the user typed.
-  useEffect(() => {
-    if (scheduledPickup) return;
-    const addr = defaultPickup.location?.address;
-    if (addr) setScheduledPickup(addr);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultPickup.location?.address]);
+  // The scheduled-route lookup (and its pincode resolution) moved to
+  // ScheduledRouteScreen, which PlanRide navigates to with the chosen
+  // pickup/drop. Home no longer fetches routes it doesn't render.
 
-  // Fetch scheduled routes for the current pickup/drop pair whenever the
-  // user is actively on the Scheduled tab. We resolve each address to
-  // coords via the autocomplete proxy first, exactly the way the old
-  // ScheduledRouteScreen used to do — so the backend can rank routes by
-  // proximity to the chosen stops.
-  useEffect(() => {
-    if (activeTab !== 'scheduled') return;
-    let cancelled = false;
-
-    const resolveCoords = async (text: string) => {
-      const trimmed = text?.trim();
-      if (!trimmed) return undefined;
-      try {
-        const results = await geoService.autocomplete(trimmed, 1);
-        if (results.length === 0) return undefined;
-        return { lat: results[0].lat, lng: results[0].lng };
-      } catch {
-        return undefined;
-      }
-    };
-
-    setScheduledRoutesError(null);
-    setScheduledRoutes(null); // show loading while we refetch
-
-    (async () => {
-      const pickupCoords = await resolveCoords(scheduledPickup);
-      const dropCoords = await resolveCoords(scheduledDrop);
-      if (cancelled) return;
-      try {
-        const apiRoutes = await routeService.listScheduled({
-          // Show every active scheduled route the admin has defined,
-          // regardless of whether a driver has been approved yet. The
-          // approved-driver gate used to live here but it hid freshly-
-          // created routes during testing and confused the rider — the
-          // booking step itself enforces driver availability at the
-          // departure time, so discovery shouldn't pre-filter on it.
-          hasApprovedDriver: false,
-          pickup: pickupCoords,
-          drop: dropCoords,
-          // Prefer pincode matching — the picker captured it from the
-          // autocomplete result. Without it the backend would only match
-          // on raw coords and miss routes the rider could obviously board
-          // (e.g. anywhere in Kasganj on the Kasganj→Aligarh route).
-          // Falls back to the rider's *current* GPS pincode so the list is
-          // scoped to their area before they pick a pickup — if nothing in
-          // that pincode matches, the empty state shows (strict nearby-only).
-          pickupPincode: scheduledPickupPincode ?? currentPincode,
-          dropPincode: scheduledDropPincode,
-        });
-        if (cancelled) return;
-        const ui = apiRoutes.map(routeToUi);
-        setScheduledRoutes(ui);
-        if (ui.length > 0) setSelectedScheduledRouteId(ui[0].id);
-        else setSelectedScheduledRouteId(null);
-      } catch (err: any) {
-        if (cancelled) return;
-        setScheduledRoutesError(err?.message ?? 'Could not load routes');
-        setScheduledRoutes([]);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeTab,
-    scheduledPickup,
-    scheduledDrop,
-    scheduledPickupPincode,
-    scheduledDropPincode,
-    currentPincode,
-  ]);
 
   // Poll nearby drivers every 15s so the map stays alive. We deliberately
   // gate on `effectiveCenter` being non-null — until the device returns a
@@ -349,13 +232,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     };
   }, [effectiveCenter?.lat, effectiveCenter?.lng]);
 
-  const isPrivate = activeTab === 'private';
   const isScheduled = activeTab === 'scheduled';
-
-  // Drop-off label for the "Where to?" field. Scheduled keeps its own local
-  // input (drives the route lookup); Instant/Private read the drop straight
-  // from Redux, which the inline drop picker and saved-address rows populate.
-  const dropLabel = isScheduled ? scheduledDrop : reduxDropoff?.address;
 
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -402,44 +279,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     if (c.includes('orange')) return 'rgba(255,140,0,0.4)';
     return 'rgba(255,255,255,0.55)';
   };
-
-  // Top-3 saved addresses to suggest for the booking flow. We rank by:
-  //   1. Geographic distance from the user's current GPS fix (closest first).
-  //   2. Primary address gets a small constant boost so it surfaces when the
-  //      user is roughly anywhere in the same city.
-  //   3. Addresses with no coordinates fall to the bottom (legacy entries).
-  const PROXIMITY_RADIUS_KM = 8;
-  const nearbySavedAddresses = useMemo(() => {
-    const list = user?.savedAddresses ?? [];
-    if (list.length === 0) return [];
-
-    const KM_PER_DEG_LAT = 111;
-    const kmPerDegLng = 111 * Math.cos((userCoords.lat * Math.PI) / 180) || 111;
-
-    const scored = list.map((a, idx) => {
-      const hasCoords = a.lat !== 0 || a.lng !== 0;
-      let distanceKm = Number.POSITIVE_INFINITY;
-      if (hasCoords) {
-        const dLat = (a.lat - userCoords.lat) * KM_PER_DEG_LAT;
-        const dLng = (a.lng - userCoords.lng) * kmPerDegLng;
-        distanceKm = Math.sqrt(dLat * dLat + dLng * dLng);
-      }
-      // Primary boost: subtract 0.5km from its score so a primary tied with
-      // another address always wins, but a far-away primary still doesn't
-      // beat a much closer non-primary.
-      const score = distanceKm - (a.isPrimary ? 0.5 : 0);
-      return { addr: a, idx, distanceKm, score };
-    });
-
-    scored.sort((a, b) => a.score - b.score);
-    return scored.slice(0, 3);
-  }, [user?.savedAddresses, userCoords.lat, userCoords.lng]);
-
-  // Whether at least one saved address is "near" the user. Used to decide
-  // whether to surface the suggestion card on the Scheduled tab.
-  const hasNearbySaved =
-    nearbySavedAddresses.length > 0 &&
-    nearbySavedAddresses[0].distanceKm <= PROXIMITY_RADIUS_KM;
 
   // Drivers ready to render as map markers. Each gets a stable rotation/size
   // so the icon doesn't reshuffle on every poll; the position comes straight
@@ -517,27 +356,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // pickup location. Programmatic recenters (GPS move / snap-back) never set
   // this flag, so auto-recentering never clobbers a manually chosen pickup.
   const userPannedRef = useRef(false);
-  const geocodeSeqRef = useRef(0);
-  const [pickupGeocoding, setPickupGeocoding] = useState(false);
-
-  const reverseGeocodePickup = async (lat: number, lng: number) => {
-    const seq = ++geocodeSeqRef.current;
-    setPickupGeocoding(true);
-    try {
-      const res = await geoService.reverse(lat, lng);
-      if (seq !== geocodeSeqRef.current) return;
-      dispatch(
-        setPickup({
-          address: res?.address || res?.displayName || 'Pinned location',
-          lat,
-          lng,
-          ...(res?.parts?.pincode ? { pincode: res.parts.pincode } : {}),
-        }),
-      );
-    } finally {
-      if (seq === geocodeSeqRef.current) setPickupGeocoding(false);
-    }
-  };
 
   const handleRegionChangeComplete = (region: Region) => {
     if (isSnappingRef.current) {
@@ -588,13 +406,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       );
     }
 
-    // The rider dragged the map → adopt the (clamped) centre as the pickup
-    // point. clampedLat/Lng is the final resting centre whether or not we
-    // snapped, so we geocode it directly rather than waiting on the snap.
-    if (userPannedRef.current) {
-      userPannedRef.current = false;
-      reverseGeocodePickup(clampedLat, clampedLng);
-    }
+    // Panning no longer sets a pickup — the Home map is a read-only view of
+    // nearby cabs. We still clear the flag so the clamp logic above keeps
+    // distinguishing user pans from programmatic recentres.
+    if (userPannedRef.current) userPannedRef.current = false;
   };
 
   const activeCount =
@@ -626,13 +441,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       {/* ── Teal Top Bar ── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <View style={styles.topBarInner}>
-          {/* Menu + Greeting */}
+          {/* Profile + Greeting. The account button shows the user's actual
+              profile picture (falls back to their initial when none is set)
+              instead of the old generic menu glyph. */}
           <View style={styles.topLeft}>
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => navigation.navigate('Account')}
+              style={styles.menuButton}
             >
-              <MenuIcon size={46} color={Colors.white} />
+              {user?.avatar ? (
+                <Image source={{ uri: user.avatar }} style={styles.menuAvatar} />
+              ) : (
+                <View style={styles.menuInitialsCircle}>
+                  <Text style={styles.menuInitialsText}>
+                    {(user?.firstName?.[0] || 'U').toUpperCase()}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <View style={styles.greetingBlock}>
               <View style={styles.greetingRow}>
@@ -644,8 +470,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text style={styles.userName}>{firstName}</Text>
             </View>
           </View>
-          {/* Right cluster: wallet */}
+          {/* Right cluster: notifications + wallet */}
           <View style={styles.topRight}>
+            {/* Notification bell with unread badge */}
+            <TouchableOpacity
+              style={styles.notifButton}
+              onPress={() => navigation.navigate('Notifications')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="notifications-outline" size={20} color={Colors.white} />
+              {notificationCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {notificationCount > 9 ? '9+' : notificationCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
             {/* Wallet Badge */}
             <TouchableOpacity style={styles.walletBadge} onPress={() => navigation.navigate('WalletTopUp')} activeOpacity={0.85}>
               <Ionicons name="wallet-outline" size={16} color={Colors.primary} />
@@ -719,17 +560,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Ionicons name="flash" size={12} color="#FFFFFF" />
               <Text style={styles.cabBadgeText}>{badgeText}</Text>
             </View>
-
-            {/* Fixed centre pickup pin. The rider drags the map under it; on
-                settle we reverse-geocode the centre into their pickup. */}
-            <View pointerEvents="none" style={styles.centerPinWrap}>
-              <View style={styles.centerPinPill}>
-                <Text style={styles.centerPinPillText} numberOfLines={1}>
-                  {pickupGeocoding ? 'Locating…' : 'Move map to set pickup'}
-                </Text>
-              </View>
-              <Ionicons name="location" size={38} color={Colors.primary} />
-            </View>
+            {/* The map is now a live view of nearby cabs only — the centre
+                pickup pin moved into the Plan-your-ride flow, so panning
+                here no longer sets anything. */}
           </>
         )}
       </View>
@@ -742,12 +575,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           it, the cards were clipped at the bottom of the sheet and
           nothing scrolled (the sheet itself is position:absolute, so
           the page-level ScrollView never sees this content). */}
-      <View
-        style={[
-          styles.bottomSheet,
-          isScheduled && { top: headerHeight },
-        ]}
-      >
+      {/* Bottom half: tabs + primary action + promotions. Fixed to the
+          lower half of the screen so the map always owns the top half,
+          on every tab (Scheduled no longer hides the map). */}
+      <View style={styles.bottomSheet}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
@@ -762,7 +593,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {/* Handle */}
         <View style={styles.handle} />
 
-        {/* Ride Type Tabs */}
+        {/* ── Ride Type Tabs ──
+            Tapping a tab opens "Plan your ride", where pickup / drop /
+            rider are entered. Home itself is now just the live cab map,
+            these three tabs, and promotions below. */}
         <View style={styles.tabRow}>
           {tabs.map(({ key, label, Icon }) => {
             const isActive = activeTab === key;
@@ -771,7 +605,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <TouchableOpacity
                 key={key}
                 style={[styles.tab, isActive && styles.tabActive]}
-                onPress={() => setActiveTab(key)}
+                onPress={() => {
+                  setActiveTab(key);
+                  navigation.navigate('PlanRide', { rideType: key });
+                }}
                 activeOpacity={0.7}
               >
                 <View style={{ marginRight: 5 }}>
@@ -790,402 +627,86 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           })}
         </View>
 
-        {isScheduled && (
-          <View style={styles.scheduledCountChip}>
-            <Ionicons name="people-outline" size={14} color={Colors.primary} />
-            <Text style={styles.scheduledCountText}>{badgeText}</Text>
-          </View>
-        )}
+        {/* One obvious action for the selected tab, so the sheet still
+            works if the rider never taps a tab at all. */}
+        <TouchableOpacity
+          style={styles.planCta}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('PlanRide', { rideType: activeTab })}
+        >
+          <Ionicons name="search" size={18} color={Colors.white} />
+          <Text style={styles.planCtaText}>Where are you going?</Text>
+        </TouchableOpacity>
 
-        {/* Pickup Input — same tap-to-open-picker behaviour across all
-            tabs (Instant / Private / Scheduled) so the user always gets
-            live autocomplete instead of a bare text field on Scheduled. */}
-        <View style={styles.inputWrapper}>
-          <Text style={styles.inputFloatLabel}>{isScheduled ? 'From' : 'Pickup location'}</Text>
-          <TouchableOpacity
-            style={[styles.inputContainer, styles.inputContainerActive]}
-            activeOpacity={0.8}
-            onPress={() => setShowPickupPicker(true)}
+        {/* ── Promotions & updates ──
+            Real, tappable content: the headline card is the live admin
+            recharge offer; the others deep-link to Refer & Earn and the
+            scheduled shuttle flow. */}
+        <View style={styles.promoSection}>
+          <Text style={styles.promoHeading}>Offers & updates</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.promoRail}
           >
-            <View style={styles.inputIconCircle}>
-              <Image source={pickupGif} style={styles.inputIconImage} resizeMode="contain" />
-            </View>
-            <Text style={styles.inputValue} numberOfLines={1}>
-              {reduxPickup?.address
-                || (isScheduled && scheduledPickup)
-                || defaultPickup.location?.address
-                || 'Set your pickup location'}
-            </Text>
-            <TouchableOpacity style={styles.gpsButton}>
-              <TargetIcon size={24} color={Colors.primary} />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </View>
-
-        {/* Drop-off Input.
-            - Instant / Private → navigates to the full-screen SearchRide
-              flow (which itself uses the same geo autocomplete).
-            - Scheduled → opens the inline picker sheet in drop mode so
-              the rider gets the same live search experience without
-              losing the tab they're on. The picked address is stored in
-              both Redux (for ScheduledRouteScreen to read) and local
-              scheduledDrop state (so the label here updates). */}
-        <View style={styles.inputWrapper}>
-          <Text style={styles.inputFloatLabel}>{isScheduled ? 'To' : 'Where to?'}</Text>
-          <TouchableOpacity
-            style={styles.inputContainer}
-            activeOpacity={0.8}
-            onPress={() => setShowDropPicker(true)}
-          >
-            <View style={[styles.inputIconCircle, styles.inputIconCircleDrop]}>
-              <Image source={dropGif} style={styles.inputIconImage} resizeMode="contain" />
-            </View>
-            {dropLabel ? (
-              <Text style={styles.inputValue} numberOfLines={1}>
-                {dropLabel}
-              </Text>
-            ) : (
-              <Text style={styles.inputPlaceholder} numberOfLines={1}>
-                Where is your Drop?
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Saved addresses as quick drop-offs on Instant/Private. Tapping a
-            row fills the drop straight from the address book — the same job
-            the old SearchRide screen did, but inline so the rider never
-            leaves Home. */}
-        {!isScheduled && nearbySavedAddresses.length > 0 && (
-          <View style={styles.recentSection}>
-            <View style={styles.recentHeader}>
-              <Text style={styles.recentTitle}>Saved addresses</Text>
-            </View>
-            {nearbySavedAddresses.map((entry) => (
+            {promoOffer && (
               <TouchableOpacity
-                key={`drop-${entry.idx}-${entry.addr.label}`}
-                style={styles.recentRow}
-                activeOpacity={0.7}
-                onPress={() =>
-                  dispatch(
-                    setDropoff({
-                      address: entry.addr.address,
-                      lat: entry.addr.lat,
-                      lng: entry.addr.lng,
-                    }),
-                  )
-                }
+                style={[styles.promoCard, { backgroundColor: '#0097B3' }]}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('WalletTopUp')}
               >
-                <View style={styles.recentIcon}>
-                  <Ionicons
-                    name={(entry.addr.icon as any) || 'location'}
-                    size={20}
-                    color={Colors.primary}
-                  />
+                <View style={styles.promoIconWrap}>
+                  <Ionicons name="gift-outline" size={22} color="#FFFFFF" />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.recentTitleText}>{entry.addr.label}</Text>
-                    {entry.addr.isPrimary && (
-                      <View style={styles.recentPrimaryPill}>
-                        <Text style={styles.recentPrimaryPillText}>Primary</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.recentSub} numberOfLines={1}>
-                    {entry.addr.address}
-                  </Text>
-                </View>
-                <Text style={styles.recentDistance}>
-                  {Number.isFinite(entry.distanceKm)
-                    ? `${entry.distanceKm.toFixed(1)} km`
-                    : ''}
+                <Text style={styles.promoTitle} numberOfLines={1}>
+                  {'\u20B9'}{promoOffer.bonusAmount ?? 0} bonus
                 </Text>
+                <Text style={styles.promoSub} numberOfLines={2}>
+                  Recharge {'\u20B9'}{promoOffer.amount} and get {'\u20B9'}
+                  {promoOffer.bonusAmount ?? 0} extra in your wallet
+                </Text>
+                <Text style={styles.promoCta}>Recharge now {'\u2192'}</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Saved-address suggestions on the Scheduled tab. When the user is
-            near at least one saved address we surface the top-3 nearest with
-            a "Near you" hint so they can one-tap pick a known pickup; otherwise
-            we keep the static demo list as a placeholder. */}
-        {isScheduled && nearbySavedAddresses.length > 0 && (
-          <View style={styles.recentSection}>
-            <View style={styles.recentHeader}>
-              <Text style={styles.recentTitle}>
-                {hasNearbySaved ? 'Saved addresses near you' : 'Your saved addresses'}
-              </Text>
-            </View>
-            {nearbySavedAddresses.map((entry) => (
-              <TouchableOpacity
-                key={`${entry.idx}-${entry.addr.label}`}
-                style={styles.recentRow}
-                activeOpacity={0.7}
-                onPress={() => {
-                  // Just set the pickup inline — the route list below
-                  // refetches automatically off this state, no need to
-                  // route to a separate screen for the same job.
-                  setScheduledPickup(entry.addr.address);
-                }}
-              >
-                <View style={styles.recentIcon}>
-                  <Ionicons
-                    name={(entry.addr.icon as any) || 'location'}
-                    size={20}
-                    color={Colors.primary}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.recentTitleText}>{entry.addr.label}</Text>
-                    {entry.addr.isPrimary && (
-                      <View style={styles.recentPrimaryPill}>
-                        <Text style={styles.recentPrimaryPillText}>Primary</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.recentSub} numberOfLines={1}>
-                    {entry.addr.address}
-                  </Text>
-                </View>
-                <Text style={styles.recentDistance}>
-                  {Number.isFinite(entry.distanceKm)
-                    ? `${entry.distanceKm.toFixed(1)} km`
-                    : ''}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Inline scheduled-route picker. Replaces the old ScheduledRoute
-            screen so the rider never leaves Home to pick a route — the
-            list refetches as they edit pickup/drop above, and tapping
-            "Schedule Ride" jumps straight to ScheduledBoardingDrop with
-            whichever row is selected. */}
-        {isScheduled && (
-          <View style={styles.scheduledRoutes}>
-            {scheduledRoutes === null && !scheduledRoutesError && (
-              <View style={styles.scheduledRoutesEmpty}>
-                <Text style={styles.scheduledRoutesEmptyText}>Loading routes…</Text>
-              </View>
             )}
-            {scheduledRoutesError && (
-              <View style={styles.scheduledRoutesEmpty}>
-                <Text style={styles.scheduledRoutesEmptyText}>{scheduledRoutesError}</Text>
-              </View>
-            )}
-            {scheduledRoutes && scheduledRoutes.length === 0 && !scheduledRoutesError && (
-              <View style={styles.scheduledRoutesEmpty}>
-                <Text style={styles.scheduledRoutesEmptyText}>
-                  No scheduled routes match these stops. Try changing your pickup
-                  or drop location.
-                </Text>
-              </View>
-            )}
-            {scheduledRoutes?.map((r) => {
-              const isActive = r.id === selectedScheduledRouteId;
-              const durationLabel = r.durationMin > 0 ? `${r.durationMin}min` : '—';
-              const remaining = Math.max(0, r.capacity - (r.bookedSeats ?? 0));
-              const availableLabel = r.capacity
-                ? `${remaining}/${r.capacity}`
-                : '—';
-              return (
-                <TouchableOpacity
-                  key={r.id}
-                  activeOpacity={0.9}
-                  onPress={() => setSelectedScheduledRouteId(r.id)}
-                  style={[styles.routeCard, isActive && styles.routeCardActive]}
-                >
-                  <Text style={styles.routeName} numberOfLines={1}>
-                    {r.name}
-                  </Text>
-
-                  {/* Stop list — pickup, vertical connector, dropoff.
-                      Matches Figma's "City Center → Station B" treatment. */}
-                  <View style={styles.routeStopRow}>
-                    <View style={styles.routeStopIconWrap}>
-                      <Ionicons
-                        name="navigate-circle-outline"
-                        size={18}
-                        color={Colors.primary}
-                      />
-                    </View>
-                    <Text style={styles.routeStopText} numberOfLines={1}>
-                      {r.from}
-                    </Text>
-                  </View>
-                  <View style={styles.routeStopConnector} />
-                  <View style={styles.routeStopRow}>
-                    <View style={styles.routeStopIconWrap}>
-                      <Ionicons name="location-outline" size={18} color="#9CA3AF" />
-                    </View>
-                    <Text style={styles.routeStopText} numberOfLines={1}>
-                      {r.to}
-                    </Text>
-                  </View>
-
-                  {!!r.nearestPickupStopName && r.nearestPickupStopKm != null && (
-                    <View style={styles.routeNearestStop}>
-                      <Ionicons name="walk-outline" size={14} color={Colors.primary} />
-                      <Text style={styles.routeNearestStopText}>
-                        Boards at {r.nearestPickupStopName} •{' '}
-                        {r.nearestPickupStopKm.toFixed(1)} km away
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Duration / Available / Price — matches the Figma trio.
-                      Small icon+label above (30% opacity), big SemiBold
-                      value below. */}
-                  <View style={styles.routeMetricsRow}>
-                    <View style={styles.routeMetricCell}>
-                      <View style={styles.routeMetricHead}>
-                        <Ionicons name="time-outline" size={12} color="#6A7282" />
-                        <Text style={styles.routeMetricLabel}>Duration</Text>
-                      </View>
-                      <Text style={styles.routeMetricValue}>{durationLabel}</Text>
-                    </View>
-                    <View style={styles.routeMetricCell}>
-                      <View style={styles.routeMetricHead}>
-                        <Ionicons name="person-outline" size={12} color="#6A7282" />
-                        <Text style={styles.routeMetricLabel}>Available</Text>
-                      </View>
-                      <Text style={styles.routeMetricValue}>{availableLabel}</Text>
-                    </View>
-                    <View style={styles.routeMetricCell}>
-                      <View style={styles.routeMetricHead}>
-                        <Ionicons name="card-outline" size={12} color="#6A7282" />
-                        <Text style={styles.routeMetricLabel}>Price</Text>
-                      </View>
-                      <Text style={styles.routeMetricValue}>₹ {r.price}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.routeCardDivider} />
-                  <Text style={styles.routeNextDeparture}>
-                    Next Departure: {r.nextDeparture}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Book Now / Hire Now button (Instant / Private). The Scheduled
-            tab's "Schedule Ride" button is rendered as a floating footer
-            below — outside the ScrollView — so the route list scrolls behind
-            it and the rider can tap it without scrolling past the whole list. */}
-        {!isScheduled && (
-          <TouchableOpacity
-            style={styles.bookNowButton}
-            activeOpacity={0.85}
-            onPress={() => setShowRiderSheet(true)}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {isPrivate ? (
-                <CarIcon size={20} color={Colors.white} />
-              ) : (
-                <FlashIcon size={16} color={Colors.white} />
-              )}
-              <Text style={styles.bookNowText}>
-                {isPrivate ? 'Hire Now' : 'Book Now'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        </ScrollView>
-
-        {/* Floating "Schedule Ride" — Scheduled tab only. Pinned to the
-            bottom of the sheet so the route list scrolls behind it. Jumps
-            straight to ScheduledBoardingDrop with the inline-selected route. */}
-        {isScheduled && (
-          <View style={[styles.scheduleFloatingFooter, { paddingBottom: insets.bottom + 12 }]}>
             <TouchableOpacity
-              style={[styles.bookNowButton, !selectedScheduledRouteId && { opacity: 0.5 }]}
-              activeOpacity={0.85}
-              disabled={!selectedScheduledRouteId}
-              onPress={() => {
-                const selected =
-                  scheduledRoutes?.find((r) => r.id === selectedScheduledRouteId) ?? null;
-                if (!selected) return;
-                navigation.navigate('ScheduledBoardingDrop', { route: selected });
-              }}
+              style={[styles.promoCard, { backgroundColor: '#10B981' }]}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('ReferEarn')}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="time-outline" size={20} color={Colors.white} />
-                <Text style={styles.bookNowText}>Schedule Ride</Text>
+              <View style={styles.promoIconWrap}>
+                <Ionicons name="people-outline" size={22} color="#FFFFFF" />
               </View>
+              <Text style={styles.promoTitle} numberOfLines={1}>
+                Refer & Earn
+              </Text>
+              <Text style={styles.promoSub} numberOfLines={2}>
+                Invite friends to UKCAAR and earn wallet rewards
+              </Text>
+              <Text style={styles.promoCta}>Invite now {'\u2192'}</Text>
             </TouchableOpacity>
-          </View>
-        )}
+            <TouchableOpacity
+              style={[styles.promoCard, { backgroundColor: '#6366F1' }]}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('PlanRide', { rideType: 'scheduled' })}
+            >
+              <View style={styles.promoIconWrap}>
+                <Ionicons name="calendar-outline" size={22} color="#FFFFFF" />
+              </View>
+              <Text style={styles.promoTitle} numberOfLines={1}>
+                Daily shuttle seats
+              </Text>
+              <Text style={styles.promoSub} numberOfLines={2}>
+                Book fixed-route scheduled rides at pocket-friendly fares
+              </Text>
+              <Text style={styles.promoCta}>See routes {'\u2192'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+        </ScrollView>
       </View>
 
-      <BookingRideForSheet
-        visible={showRiderSheet}
-        onClose={() => setShowRiderSheet(false)}
-        onDone={(rider) => {
-          setShowRiderSheet(false);
-          // Effective pickup = whatever the rider set (map pin / picker)
-          // falling back to the resolved default (GPS → saved).
-          const pickupLoc = reduxPickup ?? defaultPickup.location;
-          if (!pickupLoc) {
-            // No pickup at all — let them set one before we can price a ride.
-            setShowPickupPicker(true);
-            return;
-          }
-          if (!reduxDropoff) {
-            // Booking needs a destination; open the drop picker inline.
-            setShowDropPicker(true);
-            return;
-          }
-          // Make sure Redux carries the pickup (default may not have been
-          // dispatched yet) so SelectRide can estimate fares straight away.
-          if (!reduxPickup) dispatch(setPickup(pickupLoc));
-          navigation.navigate('SelectRide', {
-            pickup: pickupLoc.address,
-            dropoff: reduxDropoff.address,
-            // Booking-for-others: pass the rider name (undefined when it's
-            // the account holder) so the ride is attributed correctly.
-            bookingForName: rider.name === 'Myself' ? undefined : rider.name,
-          });
-        }}
-      />
-
-      <PickupPickerSheet
-        visible={showPickupPicker}
-        onClose={() => setShowPickupPicker(false)}
-        liveCoords={live.coords ? { lat: live.coords.lat, lng: live.coords.lng } : null}
-        liveAddress={live.address}
-        // Scheduled tab tracks pickup in local state too so the input
-        // label and the navigation params see the same value; the sheet
-        // dispatches setPickup() to Redux either way for the existing
-        // Instant/Private flows.
-        onPicked={(loc) => {
-          if (isScheduled) {
-            setScheduledPickup(loc.address);
-            setScheduledPickupPincode(loc.pincode);
-          }
-        }}
-      />
-
-      <PickupPickerSheet
-        visible={showDropPicker}
-        onClose={() => setShowDropPicker(false)}
-        liveCoords={live.coords ? { lat: live.coords.lat, lng: live.coords.lng } : null}
-        liveAddress={live.address}
-        mode="drop"
-        onPicked={(loc) => {
-          // The sheet already dispatches setDropoff() to Redux (which drives
-          // Instant/Private). Only the Scheduled tab needs the value mirrored
-          // into its local state for the route lookup + input label.
-          if (isScheduled) {
-            setScheduledDrop(loc.address);
-            setScheduledDropPincode(loc.pincode);
-          }
-        }}
-      />
+      {/* The rider sheet and both address pickers moved to PlanRideScreen —
+          Home no longer collects any trip input. */}
     </View>
   );
 };
@@ -1318,13 +839,80 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
 
+  /* Primary "Where are you going?" action under the tabs. */
+  planCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 15,
+    marginTop: 18,
+  },
+  planCtaText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 15.5,
+    color: Colors.white,
+  },
+
+  /* ── Promotions rail ── */
+  promoSection: {
+    marginTop: 18,
+  },
+  promoHeading: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 10,
+  },
+  promoRail: {
+    gap: 12,
+    paddingRight: 8,
+    paddingBottom: 4,
+  },
+  promoCard: {
+    width: 200,
+    borderRadius: 14,
+    padding: 14,
+  },
+  promoIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  promoTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  promoSub: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 3,
+  },
+  promoCta: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 12,
+    color: '#FFFFFF',
+    marginTop: 10,
+  },
+
   /* ── Map ── */
+  // Map owns the top half of the screen (from under the header down to the
+  // 50% line); the sheet below owns the rest.
   mapContainer: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: height * 0.44,
-    minHeight: height * 0.34,
+    bottom: height * 0.5,
+    minHeight: height * 0.3,
     backgroundColor: Colors.mapBackground,
     overflow: 'hidden',
   },
@@ -1388,6 +976,7 @@ const styles = StyleSheet.create({
   /* ── Bottom Sheet ── */
   bottomSheet: {
     position: 'absolute',
+    top: height * 0.5,
     bottom: 0,
     left: 0,
     right: 0,

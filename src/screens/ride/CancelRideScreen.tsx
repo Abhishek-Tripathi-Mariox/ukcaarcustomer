@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { cancelRide, clearRide } from '@/store/slices/rideSlice';
 import { Colors } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
@@ -46,15 +46,38 @@ export const CancelRideScreen: React.FC<CancelRideScreenProps> = ({
   const rideId = route?.params?.rideId;
   const reason = route?.params?.reason || 'User cancelled';
   const [cancelling, setCancelling] = useState(false);
+  // Late cancels (driver arriving/arrived) attract a fee server-side. Warn
+  // BEFORE the rider confirms — previously the fee was silently debited and
+  // never mentioned anywhere in the app.
+  const currentRide = useAppSelector((s) => s.ride.currentRide);
+  const mayHaveFee =
+    !!currentRide &&
+    String(currentRide._id) === String(rideId) &&
+    ['driver_arriving', 'driver_arrived'].includes(currentRide.status);
+
+  const goHome = () =>
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
 
   const handleCancel = async () => {
     setCancelling(true);
     try {
+      let fee = 0;
       if (rideId) {
-        await dispatch(cancelRide({ id: rideId, reason })).unwrap();
+        // Backend returns { ride, fee } — surface the fee it just charged
+        // instead of throwing the response away.
+        const result: any = await dispatch(cancelRide({ id: rideId, reason })).unwrap();
+        fee = Number(result?.data?.fee ?? result?.fee ?? 0);
       }
       dispatch(clearRide());
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+      if (fee > 0) {
+        Alert.alert(
+          'Ride cancelled',
+          `A cancellation fee of ₹${fee} was charged because the driver was already on the way.`,
+          [{ text: 'OK', onPress: goHome }],
+        );
+      } else {
+        goHome();
+      }
     } catch (err: any) {
       Alert.alert('Error', err || 'Failed to cancel ride');
     } finally {
@@ -82,6 +105,7 @@ export const CancelRideScreen: React.FC<CancelRideScreenProps> = ({
         <Text style={styles.title}>Wait! Driver is almost there.</Text>
         <Text style={styles.subtitle}>
           Are you sure you still want to cancel your UKCAAR?
+          {mayHaveFee ? ' A cancellation fee may apply since the driver is already on the way.' : ''}
         </Text>
 
         <View style={styles.buttonRow}>

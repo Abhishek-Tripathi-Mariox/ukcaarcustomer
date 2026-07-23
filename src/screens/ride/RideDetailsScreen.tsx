@@ -122,7 +122,7 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
     const rideTypeLabel = (ride.rideType || '').toString().toUpperCase();
     const pickup = ride.pickup?.address || '—';
     const dropoff = ride.dropoff?.address || '—';
-    const paymentMethod = (ride.paymentMethod || 'cash').toString().toUpperCase();
+    const paymentMethod = (ride.paymentMethod || '—').toString().toUpperCase();
     const rows: string[] = [];
     rows.push(
       `<tr><td>Base Fare</td><td class="r">₹${breakdown.baseFare.toFixed(2)}</td></tr>`,
@@ -269,6 +269,24 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
 
   const inv = shortInvoiceId(ride._id);
 
+  // This screen used to be completed-only in spirit but reachable for any
+  // ride, so a CANCELLED trip rendered "Thanks for riding", a full fare and a
+  // downloadable tax invoice for a journey that never happened.
+  const isCancelled = ride.status === 'cancelled';
+  const cxl: any = (ride as any).cancellation ?? {};
+  const cancelledByLabel =
+    cxl.cancelledBy === 'driver'
+      ? 'Cancelled by driver'
+      : cxl.cancelledBy === 'system'
+      ? 'Cancelled — no driver found'
+      : cxl.cancelledBy === 'admin'
+      ? 'Cancelled by support'
+      : 'Cancelled by you';
+  const refundAmt = Number(cxl.refundAmount ?? 0);
+  const feeAmt = Number(cxl.fee ?? 0);
+  // The rating the rider gave, shown read-only on completed trips.
+  const givenRating = Number((ride as any).rating?.customerToDriver ?? 0);
+
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -282,7 +300,7 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
         >
           <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trip Summary</Text>
+        <Text style={styles.headerTitle}>{isCancelled ? 'Cancelled Ride' : 'Trip Summary'}</Text>
         <View style={{ width: s(34) }} />
       </View>
 
@@ -290,7 +308,29 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.topSubheading}>Thanks for riding with  UKCAAR!</Text>
+        {isCancelled ? (
+          <View style={styles.cancelBanner}>
+            <Ionicons name="close-circle" size={20} color="#EF4444" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cancelBannerTitle}>{cancelledByLabel}</Text>
+              {!!cxl.reason && (
+                <Text style={styles.cancelBannerReason}>{cxl.reason}</Text>
+              )}
+              {(refundAmt > 0 || feeAmt > 0) && (
+                <Text style={styles.cancelBannerMoney}>
+                  {[
+                    refundAmt > 0 ? `₹${Math.round(refundAmt)} refunded to wallet` : null,
+                    feeAmt > 0 ? `₹${Math.round(feeAmt)} cancellation fee` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')}
+                </Text>
+              )}
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.topSubheading}>Thanks for riding with  UKCAAR!</Text>
+        )}
 
         {/* Ticket Receipt Card */}
         <View style={styles.receiptCard}>
@@ -325,7 +365,8 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
             </View>
           </View>
 
-          {/* Duration Distance */}
+          {/* Duration Distance — meaningless for a trip that never ran */}
+          {!isCancelled && (
           <View style={styles.fieldSection}>
             <View style={styles.fieldHeader}>
               <Ionicons name="time-outline" size={16} color="#718096" />
@@ -335,10 +376,13 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
               {Math.round(breakdown.tripDuration)}min  |  {breakdown.tripDistance.toFixed(1)} km
             </Text>
           </View>
+          )}
 
-          <View style={styles.divider} />
+          {!isCancelled && <View style={styles.divider} />}
 
-          {/* Fare Breakdown */}
+          {/* Fare Breakdown — hidden for cancelled rides; the money line lives
+              in the banner above (fee / refund), not a fabricated fare. */}
+          {!isCancelled && (
           <View style={styles.fieldSection}>
             <View style={styles.fieldHeader}>
               <Ionicons name="receipt-outline" size={18} color="#4A5568" />
@@ -379,19 +423,40 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
               </View>
             )}
           </View>
+          )}
 
-          <View style={styles.divider} />
+          {!isCancelled && <View style={styles.divider} />}
 
           {/* Total Amount & Payment Method */}
+          {!isCancelled && (
           <View style={styles.totalBlock}>
             <View style={styles.totalRow}>
               <Text style={styles.totalTitle}>Total Amount</Text>
               <Text style={styles.totalValueBold}>₹{breakdown.totalFare.toFixed(0)}</Text>
             </View>
             <Text style={styles.paymentMethodLabel}>
-              Payment Method : {(ride.paymentMethod || 'UPI').toString().toUpperCase()}
+              Payment Method : {(ride.paymentMethod || '—').toString().toUpperCase()}
             </Text>
           </View>
+          )}
+
+          {/* Your rating — read-only once given (the Activity tab gates the
+              Rate Trip button on the same field). */}
+          {!isCancelled && givenRating > 0 && (
+            <View style={styles.ratingBlock}>
+              <Text style={styles.ratingBlockLabel}>Your rating</Text>
+              <View style={{ flexDirection: 'row', gap: 3 }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Ionicons
+                    key={star}
+                    name={star <= givenRating ? 'star' : 'star-outline'}
+                    size={16}
+                    color="#F5A623"
+                  />
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Decorative tear edge */}
           <View style={styles.tearRow}>
@@ -401,7 +466,9 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
           </View>
         </View>
 
-        {/* Get PDF Receipt button */}
+        {/* PDF receipt — only when a fare was actually paid. A cancelled or
+            unpaid ride was still offering a signed-looking tax invoice. */}
+        {!isCancelled && ride.paymentStatus !== 'pending' && ride.paymentStatus !== 'failed' && (
         <TouchableOpacity
           style={styles.pdfButton}
           activeOpacity={0.75}
@@ -410,6 +477,7 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
           <Ionicons name="download-outline" size={20} color="#4A5568" />
           <Text style={styles.pdfText}>Get PDF Receipt</Text>
         </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Bottom Footer */}
@@ -491,6 +559,46 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   content: { paddingHorizontal: s(20) },
+  cancelBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: s(10),
+    backgroundColor: '#FEF2F2',
+    borderRadius: s(12),
+    padding: s(14),
+    marginBottom: vs(16),
+  },
+  cancelBannerTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(14.5),
+    color: '#B91C1C',
+  },
+  cancelBannerReason: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12.5),
+    color: '#7F1D1D',
+    marginTop: vs(3),
+  },
+  cancelBannerMoney: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(12.5),
+    color: '#B91C1C',
+    marginTop: vs(6),
+  },
+  ratingBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: vs(12),
+    paddingTop: vs(12),
+    borderTopWidth: 1,
+    borderTopColor: '#EDF2F7',
+  },
+  ratingBlockLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(13),
+    color: '#718096',
+  },
   topSubheading: {
     fontFamily: 'Inter-Medium',
     fontSize: fs(15),

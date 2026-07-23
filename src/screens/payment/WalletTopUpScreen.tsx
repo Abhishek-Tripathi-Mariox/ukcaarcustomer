@@ -19,6 +19,7 @@ import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setWalletBalance as setGlobalWalletBalance } from '@/store/slices/appSlice';
 import { paymentService, RechargeOffer } from '@/services/paymentService';
 import { PaymentSuccessModal } from '@/components/PaymentSuccessModal';
+import { KeyboardAwareScrollView } from '@/components/common';
 
 interface WalletTopUpScreenProps {
   navigation: any;
@@ -132,6 +133,38 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
   const [successAmount, setSuccessAmount] = useState<number>(0);
   const [taxId, setTaxId] = useState<string>('');
 
+  // ── Wallet statement (transaction history) ──
+  interface StatementItem {
+    _id: string;
+    type: string;
+    amount: number;
+    method: string;
+    status: string;
+    walletCredit?: number;
+    description?: string;
+    createdAt: string;
+  }
+  const [txns, setTxns] = useState<StatementItem[] | null>(null);
+  const [txnPage, setTxnPage] = useState(1);
+  const [txnPages, setTxnPages] = useState(1);
+  const [txnLoading, setTxnLoading] = useState(false);
+
+  const loadStatement = (page: number) => {
+    setTxnLoading(true);
+    paymentService
+      .getWalletStatement(page, 10)
+      .then((res) => {
+        if (!res.success) return;
+        setTxns((prev) => (page === 1 ? res.data.items : [...(prev ?? []), ...res.data.items]));
+        setTxnPage(res.data.pagination.page);
+        setTxnPages(res.data.pagination.pages);
+      })
+      .catch(() => {
+        if (page === 1) setTxns([]);
+      })
+      .finally(() => setTxnLoading(false));
+  };
+
   // Pull the live balance + the admin-defined offers on mount. The balance
   // lives in Redux but isn't guaranteed to be hydrated when the user lands
   // here directly, which is why it used to show ₹0.
@@ -159,6 +192,9 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
         const popular = DEFAULT_OFFERS.find((o) => o.isPopular);
         setSelectedOfferId((popular ?? DEFAULT_OFFERS[0])._id);
       });
+
+    loadStatement(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
   const customNum = parseInt(customAmount, 10);
@@ -249,6 +285,8 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
         setSuccessAmount(chargeAmount ?? quote.total);
         setTaxId(`WAVE${Date.now().toString().slice(-10)}`);
         setSuccessVisible(true);
+        // Surface the fresh top-up in the statement below immediately.
+        loadStatement(1);
       } else {
         Alert.alert('Failed', 'Payment could not be verified.');
       }
@@ -279,7 +317,7 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
         <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Available Balance */}
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceAmount}>₹ {walletBalance.toFixed(0)}</Text>
@@ -395,7 +433,105 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
             </Text>
           </View>
         )}
-      </ScrollView>
+
+        {/* ── Wallet Statement ──
+            Recent transactions, newest first. Credits (top-ups, refunds)
+            show green "+", wallet debits red "−"; non-wallet ride payments
+            show the method chip instead so the rider can tell how they paid. */}
+        <View style={styles.sectionDivider} />
+        <Text style={styles.sectionTitle}>Wallet Statement</Text>
+
+        {txns === null && (
+          <ActivityIndicator color={Colors.primary} style={{ marginVertical: 18 }} />
+        )}
+        {txns !== null && txns.length === 0 && (
+          <Text style={styles.txnEmpty}>
+            No transactions yet — your recharges and ride payments will appear
+            here.
+          </Text>
+        )}
+        {txns?.map((t) => {
+          const isCredit = t.type === 'wallet_topup' || t.status === 'refunded';
+          const isWalletDebit = !isCredit && t.method === 'wallet';
+          const amount = isCredit ? t.walletCredit ?? t.amount : t.amount;
+          const failed = t.status === 'failed';
+          const pending = t.status === 'pending';
+          const when = new Date(t.createdAt);
+          const dateLabel = when.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          });
+          const timeLabel = when.toLocaleTimeString('en-IN', {
+            hour: 'numeric',
+            minute: '2-digit',
+          });
+          const title =
+            t.description ||
+            (t.type === 'wallet_topup'
+              ? 'Wallet Recharge'
+              : t.type === 'scheduled_booking'
+              ? 'Scheduled Ride'
+              : t.type === 'ride_payment'
+              ? 'Ride Payment'
+              : t.type.replace(/_/g, ' '));
+          return (
+            <View key={t._id} style={styles.txnRow}>
+              <View
+                style={[
+                  styles.txnIcon,
+                  { backgroundColor: isCredit ? '#E8F8F0' : '#FDEEEC' },
+                ]}
+              >
+                <Ionicons
+                  name={isCredit ? 'arrow-down-outline' : 'arrow-up-outline'}
+                  size={17}
+                  color={isCredit ? '#10B981' : '#F3482A'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.txnTitle} numberOfLines={1}>
+                  {title}
+                </Text>
+                <Text style={styles.txnSub} numberOfLines={1}>
+                  {dateLabel} • {timeLabel}
+                  {failed ? ' • Failed' : pending ? ' • Pending' : ''}
+                  {t.status === 'refunded' ? ' • Refunded' : ''}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text
+                  style={[
+                    styles.txnAmount,
+                    isCredit && !failed && { color: '#10B981' },
+                    isWalletDebit && !failed && { color: '#F3482A' },
+                    failed && { color: '#9CA3AF', textDecorationLine: 'line-through' },
+                  ]}
+                >
+                  {isCredit ? '+' : isWalletDebit ? '−' : ''}₹{amount}
+                </Text>
+                {!isCredit && !isWalletDebit && (
+                  <Text style={styles.txnMethod}>{t.method?.toUpperCase()}</Text>
+                )}
+              </View>
+            </View>
+          );
+        })}
+        {txns !== null && txnPage < txnPages && (
+          <TouchableOpacity
+            style={styles.txnLoadMore}
+            onPress={() => loadStatement(txnPage + 1)}
+            disabled={txnLoading}
+            activeOpacity={0.8}
+          >
+            {txnLoading ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <Text style={styles.txnLoadMoreText}>Load older transactions</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </KeyboardAwareScrollView>
 
       {/* Pay Button */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
@@ -474,6 +610,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1D262D',
     marginBottom: 16,
+  },
+
+  // Wallet statement
+  txnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  txnIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  txnTitle: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#1D262D',
+  },
+  txnSub: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 11.5,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  txnAmount: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14.5,
+    color: '#1D262D',
+  },
+  txnMethod: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  txnEmpty: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    color: '#9CA3AF',
+    lineHeight: 19,
+    marginBottom: 8,
+  },
+  txnLoadMore: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  txnLoadMoreText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 13,
+    color: Colors.primary,
   },
 
   // Amount grid

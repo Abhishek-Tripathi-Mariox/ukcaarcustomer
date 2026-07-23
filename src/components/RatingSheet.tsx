@@ -11,6 +11,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { OutlineStarIcon, RatingStarIcon } from '@/components/icons/PaymentSuccessIcons';
 import { Colors, alpha } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
@@ -26,12 +27,23 @@ interface RatingSheetProps {
 
 export const RatingSheet: React.FC<RatingSheetProps> = ({
   visible,
-  driverName = 'Ramesh yadav',
+  // Neutral defaults. These used to be a fabricated person ("Ramesh yadav",
+  // "5.0 (235 ratings)") plus a bundled stock photo — so whenever the driver
+  // payload was missing a field, the rider was shown a WRONG driver identity
+  // right after their trip.
+  driverName = 'Your driver',
   driverAvatar,
-  driverRating = '5.0 (235 ratings)',
+  driverRating,
   onClose,
   onSubmit,
 }) => {
+  // Callers pass the avatar as a plain URL string; RN's <Image> needs {uri}.
+  const avatarSource =
+    typeof driverAvatar === 'string' && driverAvatar
+      ? { uri: driverAvatar }
+      : driverAvatar && typeof driverAvatar === 'object'
+      ? driverAvatar
+      : null;
   const insets = useSafeAreaInsets();
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
@@ -63,21 +75,24 @@ export const RatingSheet: React.FC<RatingSheetProps> = ({
             {/* Driver row */}
             <View style={styles.driverRow}>
               <View style={styles.avatar}>
-                {driverAvatar ? (
-                  <Image source={driverAvatar} style={styles.avatarImg} />
+                {avatarSource ? (
+                  <Image source={avatarSource} style={styles.avatarImg} />
                 ) : (
-                  <Image
-                    source={require('../../assets/payment-success/driver-ramesh.png')}
-                    style={styles.avatarImg}
-                  />
+                  // No photo on file — show a neutral placeholder, never a
+                  // stock photo of somebody who isn't the driver.
+                  <View style={styles.avatarFallback}>
+                    <Ionicons name="person" size={s(26)} color="#9CA3AF" />
+                  </View>
                 )}
               </View>
               <View style={styles.driverInfo}>
                 <Text style={styles.driverName}>{driverName}</Text>
-                <View style={styles.ratingRow}>
-                  <OutlineStarIcon size={s(17)} color="#F5A623" />
-                  <Text style={styles.ratingText}>{driverRating}</Text>
-                </View>
+                {!!driverRating && (
+                  <View style={styles.ratingRow}>
+                    <OutlineStarIcon size={s(17)} color="#F5A623" />
+                    <Text style={styles.ratingText}>{driverRating}</Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -169,6 +184,14 @@ const styles = StyleSheet.create({
     borderRadius: s(27),
     overflow: 'hidden',
     backgroundColor: Colors.borderLight,
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarImg: {
     width: '100%',

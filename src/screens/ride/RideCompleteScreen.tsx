@@ -22,7 +22,7 @@ import {
 } from '@/components/icons/RideCompleteIcons';
 import { PaymentOptionSheet } from '@/components/PaymentOptionSheet';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setCurrentRide } from '@/store/slices/rideSlice';
+import { setCurrentRide, clearPickup, clearDropoff } from '@/store/slices/rideSlice';
 import { setWalletBalance } from '@/store/slices/appSlice';
 import { rideService } from '@/services/rideService';
 import { paymentService } from '@/services/paymentService';
@@ -65,6 +65,7 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
   const ride =
     currentRide && String(currentRide._id) === String(rideId) ? currentRide : null;
 
+
   // Refetch the ride doc on mount so we always render with the freshest
   // post-completion values — startedAt, completedAt, actualDuration —
   // even if the socket payload that triggered this screen was missing
@@ -78,6 +79,19 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
   // cash collected but nothing updates on the rider side" bug. Once the DB
   // shows the ride paid, we forward to the success screen automatically.
   const dispatch = useAppDispatch();
+
+  // The trip is over, so drop its endpoints from the ride slice. clearRide was
+  // only ever dispatched on CANCEL, so after a completed ride the old pickup +
+  // dropoff persisted for the whole session: opening Plan-your-ride again
+  // pre-filled both fields with the finished trip (and pickup stopped tracking
+  // the rider's actual location), so one tap on Continue re-booked it.
+  // This screen renders from `currentRide`, not these fields, so clearing here
+  // is safe.
+  useEffect(() => {
+    dispatch(clearPickup());
+    dispatch(clearDropoff());
+  }, [dispatch]);
+
   const paidNavRef = useRef(false);
   useEffect(() => {
     if (!rideId) return;

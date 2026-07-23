@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius } from '@/theme';
 import { faqService } from '@/services/faqService';
 import { supportService } from '@/services/supportService';
+import { appSettingsService, AppSettings } from '@/services/appSettingsService';
 import { KeyboardAwareScrollView } from '@/components/common';
 
 interface HelpSupportScreenProps {
@@ -68,14 +69,14 @@ const SUPPORT_OPTIONS = [
   {
     icon: 'call',
     label: 'Call Us',
-    desc: '+91 1800-XXX-XXXX (Toll Free)',
+    desc: '',  // filled from admin settings at render
     color: '#4CAF50',
     action: 'call',
   },
   {
     icon: 'mail',
     label: 'Email Us',
-    desc: 'support@ukcaar.com',
+    desc: '',  // filled from admin settings at render
     color: '#2196F3',
     action: 'email',
   },
@@ -90,6 +91,12 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation
   // Live admin-managed FAQs, falling back to the bundled list if the
   // request fails or returns nothing (e.g. offline or none configured yet).
   const [faqs, setFaqs] = useState<FAQItem[]>(FAQ_DATA);
+  // Support phone/email are admin-managed. They were hardcoded here, and the
+  // phone was the literal placeholder +911800XXXXXXX which cannot be dialled.
+  const [settings, setSettings] = useState<AppSettings>(appSettingsService.peek());
+  useEffect(() => {
+    appSettingsService.get().then(setSettings).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,12 +126,34 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation
       case 'chat':
         navigation.navigate('MyTickets');
         break;
-      case 'call':
-        Linking.openURL('tel:+911800XXXXXXX');
+      case 'call': {
+        const num = (settings.supportPhone || '').trim();
+        if (!num) {
+          Alert.alert(
+            'Phone support unavailable',
+            'No support number is configured yet. Please use Live Chat or Email instead.',
+          );
+          return;
+        }
+        Linking.openURL(`tel:${num.replace(/\s/g, '')}`).catch(() =>
+          Alert.alert('Unable to call', `Please dial ${num}`),
+        );
         break;
-      case 'email':
-        Linking.openURL('mailto:support@ukcaar.com?subject=UKCAAR Support Request');
+      }
+      case 'email': {
+        const mail = (settings.supportEmail || '').trim();
+        if (!mail) {
+          Alert.alert(
+            'Email support unavailable',
+            'No support email is configured yet. Please use Live Chat instead.',
+          );
+          return;
+        }
+        Linking.openURL(`mailto:${mail}?subject=UKCAAR Support Request`).catch(() =>
+          Alert.alert('Unable to open mail app', `Please email ${mail}`),
+        );
         break;
+      }
     }
   };
 
@@ -172,7 +201,16 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation
 
         {/* Contact Support */}
         <Text style={styles.sectionTitle}>Contact Us</Text>
-        {SUPPORT_OPTIONS.map((opt) => (
+        {SUPPORT_OPTIONS.map((o) => {
+          // Show the real admin-configured contact, and hide the row entirely
+          // when none is set rather than advertising a number that can't be dialled.
+          const opt =
+            o.action === 'call'
+              ? { ...o, desc: settings.supportPhone || 'Not available yet' }
+              : o.action === 'email'
+              ? { ...o, desc: settings.supportEmail || 'Not available yet' }
+              : o;
+          return (
           <TouchableOpacity
             key={opt.action}
             style={styles.supportRow}
@@ -187,7 +225,8 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation
             </View>
             <Ionicons name="chevron-forward" size={18} color="#B0B0B0" />
           </TouchableOpacity>
-        ))}
+          );
+        })}
 
         {/* FAQ Section */}
         <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>

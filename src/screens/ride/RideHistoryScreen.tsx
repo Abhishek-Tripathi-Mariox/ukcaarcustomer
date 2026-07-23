@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { driverRatingText } from '@/utils/driverRating';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
@@ -40,6 +41,10 @@ const ACTIVE_STATUSES: Ride['status'][] = [
   'driver_arriving',
   'driver_arrived',
   'in_progress',
+  // Trip ended, fare unpaid. It's still the rider's live concern — leaving it
+  // out meant the ride matched NO tab and vanished from history with no way
+  // to pay or rate it.
+  'payment_pending',
 ];
 
 const RIDE_TYPE_STYLES: Record<string, { bg: string; fg: string; label: string }> = {
@@ -85,6 +90,9 @@ const getStatusBadge = (status: Ride['status'], tab: TabKey) => {
   if (status === 'completed') {
     return { bg: 'rgba(0,200,150,0.1)', fg: '#00C896', dot: '#00C896', label: 'Completed' };
   }
+  if (status === 'payment_pending') {
+    return { bg: '#FFFBEB', fg: '#E17100', dot: '#E17100', label: 'Payment pending' };
+  }
   if (tab === 'scheduled') {
     return { bg: '#F3E8FF', fg: '#9810FA', dot: '#9810FA', label: 'Scheduled' };
   }
@@ -107,11 +115,19 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
     navigation.navigate(target as never);
   }, [navigation]);
 
+  // Server pagination. Page 1 was hardcoded and the pagination object
+  // discarded, so anyone with >50 rides silently lost their older history —
+  // the tabs sliced four ways out of a single truncated page.
+  const [pageInfo, setPageInfo] = useState({ page: 1, pages: 1 });
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const loadRides = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
       const data = await rideService.getRides(1, 50);
       setRides(data?.rides || data?.items || []);
+      const pg = data?.pagination;
+      setPageInfo({ page: pg?.page ?? 1, pages: pg?.pages ?? 1 });
     } catch (err) {
       setRides([]);
     } finally {
@@ -119,6 +135,27 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
       setRefreshing(false);
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || pageInfo.page >= pageInfo.pages) return;
+    setLoadingMore(true);
+    try {
+      const next = pageInfo.page + 1;
+      const data = await rideService.getRides(next, 50);
+      const more = data?.rides || data?.items || [];
+      setRides((prev) => {
+        // De-dupe on id — a ride can shift pages between requests.
+        const seen = new Set(prev.map((r) => String(r._id)));
+        return [...prev, ...more.filter((r: Ride) => !seen.has(String(r._id)))];
+      });
+      const pg = data?.pagination;
+      setPageInfo({ page: pg?.page ?? next, pages: pg?.pages ?? next });
+    } catch {
+      /* keep what we have; the button stays for a retry */
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, pageInfo]);
 
   // Refetch every time the Activity tab regains focus, not just on first
   // mount. The tab stays mounted, so with a plain useEffect a ride booked
@@ -197,6 +234,19 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
     if (!r) return;
     try {
       await rideService.rateRide(r._id, rating, feedback || undefined);
+      // Reflect it locally so the card swaps to the stars straight away — the
+      // list isn't refetched here, so without this the trip still looked
+      // unrated (and re-ratable) until the next load.
+      setRides((prev) =>
+        prev.map((x) =>
+          x._id === r._id
+            ? ({
+                ...x,
+                rating: { ...((x as any).rating ?? {}), customerToDriver: rating },
+              } as Ride)
+            : x,
+        ),
+      );
       Alert.alert('Thank you!', 'Your rating has been submitted.');
     } catch (err: any) {
       // Surface the backend reason (e.g. "Ride not found or not completed")
@@ -297,12 +347,17 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
       return;
     }
     if (activeTab === 'active') {
-      if (ride.status === 'in_progress') {
+      if (ride.status === 'payment_pending') {
+        // Trip ended, fare unpaid — resume at the payment screen.
+        navigation.navigate('RideComplete', { rideId: ride._id });
+      } else if (ride.status === 'in_progress') {
         navigation.navigate('InRide', { rideId: ride._id });
       } else {
         navigation.navigate('RideTracking', { rideId: ride._id });
       }
-    } else if (activeTab === 'completed') {
+    } else if (activeTab === 'completed' || activeTab === 'cancelled') {
+      // Cancelled rides were inert — no screen anywhere showed the reason,
+      // who cancelled, the fee, or the refund. RideDetails is status-aware now.
       navigation.navigate('RideDetails', { rideId: ride._id });
     }
   };
@@ -310,31 +365,79 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
   const renderRideCard = (ride: Ride) => {
     const chip = getRideTypeChip(ride.rideType);
     const badge = getStatusBadge(ride.status, activeTab);
-    const refunded = activeTab === 'cancelled' ? ride.actualFare || ride.estimatedFare : 0;
+
+    // Cancelled-ride money line. This used to read
+    //   refunded = actualFare || estimatedFare
+    // which invented a refund out of the FARE for every cancelled ride — even
+    // ones that were never paid (cash, or cancelled before payment). Only the
+    // server can say whether money actually moved, so read its fields:
+    // paymentStatus 'refunded' + the recorded refund amount, and the
+    // cancellation fee when one was actually charged.
+    const anyRide = ride as any;
+    const isCancelledCard = ride.status === 'cancelled';
+    const isScheduledRow =
+      anyRide.isScheduled === true || ride.rideType === 'scheduled';
+    // Money that actually moved. Instant/private: cancellation.refundAmount
+    // when paymentStatus flipped to refunded. Scheduled: booking.refundedAmount
+    // — the one genuine server-computed refund figure, previously never read.
+    const refunded = !isCancelledCard
+      ? 0
+      : isScheduledRow
+      ? Number(anyRide.booking?.refundedAmount ?? 0)
+      : anyRide.paymentStatus === 'refunded'
+      ? Number(anyRide.cancellation?.refundAmount ?? 0)
+      : 0;
+    const cancelFee = isCancelledCard ? Number(anyRide.cancellation?.fee ?? 0) : 0;
+    // Who cancelled — "Cancelled" for a system timeout reads as the rider's
+    // own doing; say what actually happened.
+    const cancelledBy = anyRide.cancellation?.cancelledBy as string | undefined;
+    const cancelledLabel =
+      cancelledBy === 'driver'
+        ? 'Cancelled by driver'
+        : cancelledBy === 'system'
+        ? 'No driver found'
+        : cancelledBy === 'admin'
+        ? 'Cancelled by support'
+        : 'Cancelled';
+    // Show refund AND fee together — the server can apply both on the same
+    // cancellation; the old note was a refund-or-fee ternary.
+    const moneyBits = [
+      refunded > 0 ? `₹${Math.round(refunded)} refunded` : null,
+      cancelFee > 0 ? `₹${Math.round(cancelFee)} fee` : null,
+    ].filter(Boolean);
+    const cancelNote = isCancelledCard
+      ? [cancelledLabel, ...moneyBits].join(' • ')
+      : null;
+
+    // A rating the rider already gave. When present the card shows the stars
+    // instead of an active "Rate Trip" button.
+    const givenRating: number | null =
+      typeof anyRide.rating?.customerToDriver === 'number' &&
+      anyRide.rating.customerToDriver > 0
+        ? anyRide.rating.customerToDriver
+        : null;
 
     return (
       <TouchableOpacity
         key={ride._id}
         style={styles.card}
-        activeOpacity={
-          activeTab === 'active' ||
-          activeTab === 'completed' ||
-          activeTab === 'scheduled'
-            ? 0.85
-            : 1
-        }
+        activeOpacity={0.85}
         onPress={() => handleCardPress(ride)}
       >
         {/* Header row: date + ride type chip */}
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.dateText}>{formatDateTime(ride.createdAt)}</Text>
+            <Text style={styles.dateText}>
+              {isScheduledRow && anyRide.booking?.departureDate
+                ? `${anyRide.booking.departureDate}${
+                    anyRide.booking.departureTime ? ` • ${anyRide.booking.departureTime}` : ''
+                  }`
+                : formatDateTime(ride.createdAt)}
+            </Text>
             <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
               <View style={[styles.statusDot, { backgroundColor: badge.dot }]} />
               <Text style={[styles.statusText, { color: badge.fg }]} numberOfLines={1}>
-                {activeTab === 'cancelled' && refunded > 0
-                  ? `Cancelled • ₹${Math.round(refunded)} refunded to wallet`
-                  : badge.label}
+                {cancelNote ?? badge.label}
               </Text>
             </View>
           </View>
@@ -397,17 +500,36 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
           </View>
         )}
 
-        {/* Completed rides — let the rider rate the trip after the fact. */}
+        {/* Completed rides. Once the rider has rated, show the rating they gave
+            rather than an active "Rate Trip" button — the button used to stay
+            live forever, so a rated trip looked unrated and could be re-submitted. */}
         {activeTab === 'completed' && (
           <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: '#0097B3', flexDirection: 'row' }]}
-              activeOpacity={0.8}
-              onPress={() => setRatingRide(ride)}
-            >
-              <Ionicons name="star-outline" size={16} color="#0097B3" style={{ marginRight: 6 }} />
-              <Text style={[styles.actionText, { color: '#0097B3' }]}>Rate Trip</Text>
-            </TouchableOpacity>
+            {givenRating != null ? (
+              <View style={styles.ratedRow}>
+                <Text style={styles.ratedLabel}>Your rating</Text>
+                <View style={styles.ratedStars}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Ionicons
+                      key={n}
+                      name={n <= givenRating ? 'star' : 'star-outline'}
+                      size={15}
+                      color="#F5A623"
+                    />
+                  ))}
+                </View>
+                <Text style={styles.ratedValue}>{givenRating.toFixed(1)}</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionBtn, { borderColor: '#0097B3', flexDirection: 'row' }]}
+                activeOpacity={0.8}
+                onPress={() => setRatingRide(ride)}
+              >
+                <Ionicons name="star-outline" size={16} color="#0097B3" style={{ marginRight: 6 }} />
+                <Text style={[styles.actionText, { color: '#0097B3' }]}>Rate Trip</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </TouchableOpacity>
@@ -503,6 +625,23 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
           }
         >
           {filteredRides.length === 0 ? renderEmpty() : filteredRides.map(renderRideCard)}
+
+          {/* Older history lives on later pages — page 1 used to be all
+              anyone could ever see. */}
+          {pageInfo.page < pageInfo.pages && filteredRides.length > 0 && (
+            <TouchableOpacity
+              style={styles.loadMoreBtn}
+              onPress={loadMore}
+              disabled={loadingMore}
+              activeOpacity={0.8}
+            >
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Text style={styles.loadMoreText}>Load older rides</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </ScrollView>
       )}
 
@@ -517,11 +656,7 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
             : undefined
         }
         driverAvatar={ratingRide?.driver?.avatar ?? undefined}
-        driverRating={
-          ratingRide?.driver?.driverProfile?.rating
-            ? String(ratingRide.driver.driverProfile.rating)
-            : undefined
-        }
+        driverRating={driverRatingText(ratingRide?.driver?.driverProfile?.rating)}
       />
     </View>
   );
@@ -663,6 +798,24 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
+  /* Rating already given — read-only stars in place of the Rate Trip button. */
+  ratedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+    flex: 1,
+  },
+  ratedLabel: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12.5),
+    color: '#6A7282',
+  },
+  ratedStars: { flexDirection: 'row', gap: s(2) },
+  ratedValue: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(12.5),
+    color: '#1D262D',
+  },
   actionBtn: {
     flex: 1,
     height: vs(46),
@@ -677,6 +830,16 @@ const styles = StyleSheet.create({
     lineHeight: fs(24),
   },
 
+  loadMoreBtn: {
+    alignItems: 'center',
+    paddingVertical: vs(14),
+    marginTop: vs(4),
+  },
+  loadMoreText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(13),
+    color: Colors.primary,
+  },
   emptyState: { alignItems: 'center', paddingHorizontal: s(32), paddingVertical: vs(48) },
   emptyIcon: {
     width: s(80),

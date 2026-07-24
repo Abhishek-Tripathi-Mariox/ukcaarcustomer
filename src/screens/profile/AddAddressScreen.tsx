@@ -16,6 +16,12 @@ import { Typography, Colors, Spacing, BorderRadius } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Geolocation from '@react-native-community/geolocation';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+
+const LOCATION_PERMISSION =
+  Platform.OS === 'ios'
+    ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+    : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from '@/components/common';
@@ -223,41 +229,74 @@ export const AddAddressScreen: React.FC<AddAddressScreenProps> = ({ navigation, 
   }, [coords?.lat, coords?.lng]);
 
   const handleUseCurrentLocation = async () => {
+    // Spinner goes up FIRST. It used to be set only inside the success
+    // callback, so the up-to-10s GPS wait gave zero feedback and the button
+    // read as "did nothing".
+    setSearching(true);
     try {
-      if (Platform.OS === 'android') {
-        // Permission was already declared in the manifest; the OS prompts on first use.
+      // Android does NOT auto-prompt here — a manifest entry alone isn't a
+      // grant. Without this the GPS call just errored, so the button only
+      // worked when some other screen happened to have been granted already.
+      // That's the main reason it worked "sometimes".
+      const currentPerm = await check(LOCATION_PERMISSION);
+      const status =
+        currentPerm === RESULTS.GRANTED ? currentPerm : await request(LOCATION_PERMISSION);
+      if (status !== RESULTS.GRANTED) {
+        setSearching(false);
+        Alert.alert(
+          'Location permission',
+          'Allow location access to use your current location for this address.',
+        );
+        return;
       }
-      Geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setSearching(true);
-          const result = await geoService.reverse(latitude, longitude);
-          setSearching(false);
-          if (!result) {
-            Alert.alert('Location', 'Couldn\'t resolve your current location.');
-            return;
-          }
-          applySuggestion({
-            id: `${latitude},${longitude}`,
-            displayName: result.displayName,
-            address: result.address,
-            // Pin to the actual GPS fix, not the reverse-geocoder's returned
-            // coordinate (it can snap to a road/area centroid away from the
-            // user). The address text above still describes this exact point.
-            lat: latitude,
-            lng: longitude,
-            parts: result.parts,
-          });
-        },
-        (err) => {
-          setSearching(false);
-          Alert.alert('Location', err.message || 'Couldn\'t fetch GPS location');
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
-      );
+
+      const getPosition = (opts: any) =>
+        new Promise<any>((resolve, reject) =>
+          Geolocation.getCurrentPosition(resolve, reject, opts),
+        );
+
+      // Two-stage fix. A high-accuracy satellite lock frequently times out
+      // indoors / under cover, which produced the intermittent failures. If it
+      // does, fall back to a coarse network fix and accept a recent cached one
+      // rather than failing outright.
+      let pos: any;
+      try {
+        pos = await getPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 30000,
+        });
+      } catch {
+        pos = await getPosition({
+          enableHighAccuracy: false,
+          timeout: 20000,
+          maximumAge: 5 * 60 * 1000,
+        });
+      }
+
+      const { latitude, longitude } = pos.coords;
+      const result = await geoService.reverse(latitude, longitude);
+      if (!result) {
+        Alert.alert('Location', 'Couldn\'t resolve your current location.');
+        return;
+      }
+      applySuggestion({
+        id: `${latitude},${longitude}`,
+        displayName: result.displayName,
+        address: result.address,
+        // Pin to the actual GPS fix, not the reverse-geocoder's returned
+        // coordinate (it can snap to a road/area centroid away from the
+        // user). The address text above still describes this exact point.
+        lat: latitude,
+        lng: longitude,
+        parts: result.parts,
+      });
     } catch (err: any) {
-      setSearching(false);
       Alert.alert('Location', err?.message || 'Couldn\'t fetch GPS location');
+    } finally {
+      // Single exit point — the old code had three separate setSearching(false)
+      // calls and could leave the spinner stuck on some paths.
+      setSearching(false);
     }
   };
 

@@ -20,6 +20,7 @@ import { setWalletBalance as setGlobalWalletBalance } from '@/store/slices/appSl
 import { paymentService, RechargeOffer } from '@/services/paymentService';
 import { PaymentSuccessModal } from '@/components/PaymentSuccessModal';
 import { KeyboardAwareScrollView } from '@/components/common';
+import { friendlyPaymentError } from '@/utils/paymentErrors';
 
 interface WalletTopUpScreenProps {
   navigation: any;
@@ -238,6 +239,9 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
   const handlePayNow = async () => {
     if (!quote || quote.total <= 0 || customError) return;
     setProcessing(true);
+    // True once Razorpay has actually taken the money, so the catch can tell
+    // "never charged" apart from "charged but verification failed".
+    let checkoutSucceeded = false;
     try {
       const useOffer = !hasCustom && selectedOffer && !selectedOffer._id.startsWith('default-');
       const orderRes = await paymentService.createOrder({
@@ -271,6 +275,7 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
       };
 
       const paymentData = await RazorpayCheckout.open(options);
+      checkoutSucceeded = true;
 
       const verifyRes = await paymentService.verifyPayment({
         razorpay_order_id: orderId,
@@ -291,8 +296,31 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
         Alert.alert('Failed', 'Payment could not be verified.');
       }
     } catch (err: any) {
-      if (err?.code !== 2) {
-        Alert.alert('Payment Failed', err?.description || err?.message || 'Something went wrong');
+      // Keep the technical detail in the log, never in the Alert.
+      console.warn('[wallet-topup] failed:', {
+        code: err?.code,
+        message: err?.message,
+        description: err?.description,
+      });
+      const desc = (err?.description || err?.message || '').toLowerCase();
+      // Razorpay signals cancellation as code 2 (iOS) or 0 (Android), and
+      // sometimes just a dismissed sheet with no description at all.
+      const isCancel =
+        err?.code === 2 || err?.code === '2' ||
+        err?.code === 0 || err?.code === '0' ||
+        desc.includes('cancel') || desc.includes('dismiss');
+
+      if (isCancel) {
+        // Silent — the user closed the sheet on purpose.
+      } else if (checkoutSucceeded) {
+        // The payment cleared and only our verify call failed, so money may
+        // genuinely have left their account. Don't claim they weren't charged.
+        Alert.alert(
+          'Payment received',
+          "We couldn't confirm your top-up just yet. If the amount was debited it will appear in your wallet shortly — please check your balance before trying again.",
+        );
+      } else {
+        Alert.alert('Payment failed', friendlyPaymentError(err));
       }
     } finally {
       setProcessing(false);

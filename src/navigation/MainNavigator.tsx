@@ -26,6 +26,7 @@ import {
   ToggleSwitch,
 } from '@/components/icons/ProfileIcons';
 import { SecuredShieldIcon } from '@/components/icons/PaymentOptionIcons';
+import { GiftIcon } from '@/components/icons/RideCompleteIcons';
 import { HomeGlyphIcon } from '@/components/icons/TabBarIcons';
 
 import { HomeScreen, PlanRideScreen, PickOnMapScreen } from '@/screens/home';
@@ -281,7 +282,7 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Safety')}
           activeOpacity={0.7}
         >
-          <View style={profileStyles.rowIcon}><SecuredShieldIcon size={22} /></View>
+          <View style={profileStyles.rowIcon}><SecuredShieldIcon size={19} /></View>
           <Text style={profileStyles.rowLabel}>Safety</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
@@ -301,7 +302,8 @@ const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Loyalty')}
           activeOpacity={0.7}
         >
-          <View style={profileStyles.rowIcon}><SecuredShieldIcon size={22} /></View>
+          {/* Gift, not the shield — Safety already owns the shield glyph. */}
+          <View style={profileStyles.rowIcon}><GiftIcon size={23} color={Colors.primary} /></View>
           <Text style={profileStyles.rowLabel}>Rewards & Points</Text>
           <ChevronRightIcon size={24} color="#6B7280" />
         </TouchableOpacity>
@@ -480,6 +482,10 @@ const profileStyles = StyleSheet.create({
   // fix was a per-row marginLeft patch on some rows but not others.
   rowIcon: {
     width: 28,
+    // Fixed height too — without it a taller glyph (the shield renders 1.15x
+    // its `size`) stretched its row, so Safety/Rewards sat further apart than
+    // the rest of the list.
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },

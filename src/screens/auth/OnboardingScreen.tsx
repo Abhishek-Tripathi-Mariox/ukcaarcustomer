@@ -211,6 +211,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: fs(24),
     letterSpacing: 0,
+    // The slide's 30px side padding left ~315px, but the longest authored line
+    // ("Electricians, cleaners, beauticians & more —") needs ~317px, so it
+    // overflowed by a hair and wrapped into a 3rd line. Reclaim 12px per side
+    // so each half of the "\n" break stays on one line as designed.
+    marginHorizontal: -s(Spacing.md),
   },
   bottomSection: {
     paddingHorizontal: s(Spacing.lg),

@@ -337,7 +337,9 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: vs(120) + insets.bottom }]}
+        >
           <View style={styles.routeBanner}>
             <Text style={styles.routeBannerTitle} numberOfLines={2}>{scheduledRoute.name}</Text>
             <Text style={styles.routeBannerSub} numberOfLines={2}>
@@ -429,7 +431,7 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
         </ScrollView>
       )}
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + s(16) }]}>
         <TouchableOpacity
           style={[
             styles.cta,

@@ -373,7 +373,12 @@ export const AddAddressScreen: React.FC<AddAddressScreenProps> = ({ navigation, 
         <View style={{ width: 32 }} />
       </View>
 
-      <KeyboardAwareScrollView contentContainerStyle={styles.detailsContent}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={[
+          styles.detailsContent,
+          { paddingBottom: insets.bottom + vs(Spacing['3xl']) },
+        ]}
+      >
           {/* Mini-map — pin is dropped automatically from the pincode /
               suggestion; the rider can drag it or tap the map to fine-tune the
               exact spot, which syncs city/state/pincode back from that point. */}

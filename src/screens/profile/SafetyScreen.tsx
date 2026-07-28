@@ -201,7 +201,10 @@ export const SafetyScreen: React.FC<SafetyScreenProps> = ({ navigation }) => {
         <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + vs(Spacing['3xl']) }]}
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* SOS Button */}
         <TouchableOpacity
@@ -314,7 +317,7 @@ export const SafetyScreen: React.FC<SafetyScreenProps> = ({ navigation }) => {
       <Modal visible={showAddContact} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior="padding" style={styles.modalSheet}>
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { paddingBottom: insets.bottom + vs(Spacing.xl) }]}>
               <Text style={styles.modalTitle}>Add Emergency Contact</Text>
 
               <Text style={styles.fieldLabel}>Name</Text>

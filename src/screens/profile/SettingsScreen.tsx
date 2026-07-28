@@ -227,7 +227,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
         <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + vs(Spacing['3xl']) }]}
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* Account */}
         <Text style={styles.sectionTitle}>Account</Text>

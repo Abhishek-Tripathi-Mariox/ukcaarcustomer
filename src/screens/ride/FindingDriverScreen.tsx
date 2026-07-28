@@ -17,6 +17,7 @@ import MapView, {
   PROVIDER_GOOGLE,
   Region,
 } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { Colors, Shadow } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
@@ -57,6 +58,7 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
   route,
 }) => {
   const { pickup, dropoff, rideType } = route.params;
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
   const pickupLoc = useSelector((s: RootState) => s.ride.pickup);
   const dropoffLoc = useSelector((s: RootState) => s.ride.dropoff);
@@ -531,7 +533,15 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
       </View>
 
       {/* ── Cancel Button ── */}
-      <View style={styles.cancelSection}>
+      <View
+        style={[
+          styles.cancelSection,
+          // Keep the button clear of the gesture-nav bar on edge-to-edge
+          // devices; opaque 3-button nav (insets.bottom = 0) keeps the
+          // original 32px padding.
+          { paddingBottom: Math.max(insets.bottom, vs(16)) + vs(16) },
+        ]}
+      >
         <TouchableOpacity
           style={styles.cancelButton}
           activeOpacity={0.85}

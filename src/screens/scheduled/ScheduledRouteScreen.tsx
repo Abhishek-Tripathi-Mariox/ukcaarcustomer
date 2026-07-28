@@ -208,7 +208,10 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
         <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: vs(120) + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Trip summary in the same combined box used on Plan your ride —
             read-only here; tapping it goes back so the rider can edit the
             stops that drive this route search. */}
@@ -344,7 +347,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
         })}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + s(16) }]}>
         <TouchableOpacity
           style={[styles.cta, !selected && { opacity: 0.5 }]}
           onPress={handleSelectSeats}

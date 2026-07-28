@@ -279,7 +279,7 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
         </ScrollView>
       )}
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + s(16) }]}>
         <View style={styles.totalRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.totalLabel}>Total Amount</Text>

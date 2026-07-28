@@ -180,7 +180,13 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <KeyboardAwareScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + 16,
+            paddingBottom: insets.bottom + Spacing['3xl'],
+          },
+        ]}
       >
         {/* Title */}
         <Text style={styles.title}>Complete Your Profile</Text>

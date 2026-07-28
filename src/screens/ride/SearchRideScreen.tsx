@@ -419,7 +419,10 @@ export const SearchRideScreen: React.FC<SearchRideScreenProps> = ({ navigation }
           ) : null
         }
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.resultsList}
+        contentContainerStyle={[
+          styles.resultsList,
+          { paddingBottom: insets.bottom + vs(Spacing['3xl']) },
+        ]}
         keyboardShouldPersistTaps="handled"
       />
     </View>

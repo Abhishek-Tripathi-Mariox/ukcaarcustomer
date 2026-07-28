@@ -115,7 +115,7 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: vs(120) + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.subtitle}>Review your booking details</Text>
@@ -224,7 +224,7 @@ export const ScheduledFareSummaryScreen: React.FC<Props> = ({ navigation, route 
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + vs(18) }]}>
         <TouchableOpacity
           style={styles.cta}
           onPress={handleConfirm}

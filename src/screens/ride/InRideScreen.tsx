@@ -246,13 +246,14 @@ export const InRideScreen: React.FC<InRideScreenProps> = ({
   }, [directions]);
 
   // ETA derived from the live directions response. Falls back to the
-  // route-param `duration` we got from the original estimate so the chip
-  // always shows something while the first directions call is in flight.
+  // route-param `duration` we got from the original estimate (already in
+  // minutes) so the chip always shows something while the first directions
+  // call is in flight.
   const eta = useMemo(() => {
     if (directions?.durationSeconds) {
       return Math.max(1, Math.round(directions.durationSeconds / 60));
     }
-    if (duration) return Math.max(1, Math.ceil(duration / 3));
+    if (duration) return Math.max(1, Math.round(duration));
     return 1;
   }, [directions?.durationSeconds, duration]);
 
@@ -362,26 +363,34 @@ export const InRideScreen: React.FC<InRideScreenProps> = ({
         </MapView>
       )}
 
-      {/* Info card — destination + live ETA */}
-      <View style={[styles.infoCard, { top: insets.top + 12 }]}>
-        <View style={styles.locationRow}>
-          <Ionicons name="navigate" size={18} color={Colors.primary} />
-          <Text style={styles.locationText} numberOfLines={1}>
-            {dropoff || currentRide?.dropoff?.address || '—'}
-          </Text>
-        </View>
-        <View style={styles.etaRow}>
-          <Text style={styles.etaLabel}>ETA</Text>
-          <View style={styles.etaPill}>
-            <Text style={styles.etaPillText}>{eta} min</Text>
+      {/* Top overlay — info card (destination + live ETA) on the left,
+          in-progress banner on the right. One flex row instead of two
+          absolutely-positioned siblings pinned to the same top: the old
+          layout let the "On your way to destination" banner run under/over
+          the destination + ETA card on narrower screens. The card shrinks
+          and truncates its address; the banner keeps its intrinsic size. */}
+      <View style={[styles.topOverlay, { top: insets.top + 12 }]}>
+        {/* Info card — destination + live ETA */}
+        <View style={styles.infoCard}>
+          <View style={styles.locationRow}>
+            <Ionicons name="navigate" size={18} color={Colors.primary} />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {dropoff || currentRide?.dropoff?.address || '—'}
+            </Text>
+          </View>
+          <View style={styles.etaRow}>
+            <Text style={styles.etaLabel}>ETA</Text>
+            <View style={styles.etaPill}>
+              <Text style={styles.etaPillText}>{eta} min</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* In-progress banner so it's clear the trip is live */}
-      <View style={[styles.statusBanner, { top: insets.top + 12 }]}>
-        <Ionicons name="flash" size={14} color="#333" />
-        <Text style={styles.statusBannerText}>On your way to destination</Text>
+        {/* In-progress banner so it's clear the trip is live */}
+        <View style={styles.statusBanner}>
+          <Ionicons name="flash" size={14} color="#333" />
+          <Text style={styles.statusBannerText}>On your way to destination</Text>
+        </View>
       </View>
 
       {/* SOS */}
@@ -404,11 +413,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
 
-  /* Info card */
-  infoCard: {
+  /* Top overlay row — owns the absolute positioning so the info card and
+     status banner share one row and can never overlap each other. */
+  topOverlay: {
     position: 'absolute',
     left: s(15),
-    minWidth: s(174),
+    right: s(15),
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: s(10),
+  },
+
+  /* Info card */
+  infoCard: {
+    flexShrink: 1,
   },
   locationRow: {
     flexDirection: 'row',
@@ -431,6 +450,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: fs(15),
     color: '#545365',
+    flexShrink: 1,
     maxWidth: s(220),
   },
   etaRow: {
@@ -468,8 +488,6 @@ const styles = StyleSheet.create({
   },
 
   statusBanner: {
-    position: 'absolute',
-    right: s(15),
     flexDirection: 'row',
     alignItems: 'center',
     gap: s(6),

@@ -116,7 +116,9 @@ export const ScheduledPassengerDetailsScreen: React.FC<Props> = ({ navigation, r
         <View style={{ width: 32 }} />
       </View>
 
-      <KeyboardAwareScrollView contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: vs(120) + insets.bottom }]}
+      >
         {passengers.map((p, idx) => (
           <View key={p.seat} style={styles.card}>
             <View style={styles.cardHeader}>
@@ -160,7 +162,7 @@ export const ScheduledPassengerDetailsScreen: React.FC<Props> = ({ navigation, r
         ))}
       </KeyboardAwareScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + vs(18) }]}>
         <TouchableOpacity
           style={[styles.cta, !allFilled && styles.ctaDisabled]}
           onPress={handleContinue}

@@ -165,7 +165,13 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <KeyboardAwareScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + 16,
+            paddingBottom: insets.bottom + vs(Spacing['3xl']),
+          },
+        ]}
       >
         {/* Header */}
         <View style={styles.header}>

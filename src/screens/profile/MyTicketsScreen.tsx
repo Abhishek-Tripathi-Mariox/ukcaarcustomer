@@ -105,7 +105,7 @@ export const MyTicketsScreen: React.FC<MyTicketsScreenProps> = ({ navigation }) 
           data={tickets}
           keyExtractor={(t) => t._id}
           renderItem={renderItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + s(Spacing.xl) }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

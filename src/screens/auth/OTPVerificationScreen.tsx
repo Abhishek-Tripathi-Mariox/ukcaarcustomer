@@ -216,7 +216,13 @@ export const OTPVerificationScreen: React.FC<OTPScreenProps> = ({
         style={styles.flex}
       >
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.lg }]}
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: insets.top + Spacing.lg,
+              paddingBottom: insets.bottom + vs(Spacing['2xl']),
+            },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >

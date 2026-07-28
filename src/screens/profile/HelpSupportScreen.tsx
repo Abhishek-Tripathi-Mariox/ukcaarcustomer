@@ -197,7 +197,12 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation
         <View style={{ width: 32 }} />
       </View>
 
-      <KeyboardAwareScrollView contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + vs(Spacing['3xl']) },
+        ]}
+      >
 
         {/* Contact Support */}
         <Text style={styles.sectionTitle}>Contact Us</Text>

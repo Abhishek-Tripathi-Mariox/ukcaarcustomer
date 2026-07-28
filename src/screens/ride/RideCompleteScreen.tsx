@@ -362,7 +362,10 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + vs(40) },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header — Success Icon + Text */}

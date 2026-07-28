@@ -33,12 +33,6 @@ const slides = [
     title: 'Schedule Rides in Advance',
     subtitle: 'Plan your trips easily — book a taxi for later and\nenjoy on-time pickups without the wait.',
   },
-  {
-    id: '3',
-    image: require('../../../assets/images/onboarding-safe.png'),
-    title: 'Safe & Reliable Every Time',
-    subtitle: 'Electricians, cleaners, beauticians & more —\nverified experts just a tap away.',
-  },
 ];
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
@@ -131,7 +125,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }
       </View>
 
       {/* Bottom Section — fixed at bottom */}
-      <View style={styles.bottomSection}>
+      <View
+        style={[
+          styles.bottomSection,
+          { paddingBottom: insets.bottom + vs(Spacing['2xl']) },
+        ]}
+      >
         {/* Dots indicator */}
         <View style={styles.pagination}>
           {slides.map((_, i) => (

@@ -297,7 +297,7 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>

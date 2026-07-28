@@ -62,7 +62,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: insets.top + Spacing['2xl'] },
+            {
+              paddingTop: insets.top + Spacing['2xl'],
+              paddingBottom: insets.bottom + vs(Spacing['3xl']),
+            },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

@@ -201,7 +201,19 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
   // backend with status already past 'driver_arrived'.
   useEffect(() => {
     if (status === 'in_progress' && rideId) {
-      navigation.replace('InRide', { rideId });
+      // Forward the trip context (addresses, fare, routed distance/duration,
+      // driver) so InRide's ETA fallback and the receipt handoff don't start
+      // from empty params.
+      navigation.replace('InRide', {
+        rideId,
+        pickup,
+        dropoff,
+        rideType,
+        fare,
+        distance,
+        duration,
+        driver,
+      });
     } else if ((status === 'payment_pending' || status === 'completed') && rideId) {
       // payment_pending is the new intermediate state where the trip has
       // ended but the rider hasn't paid yet — the receipt screen
@@ -397,7 +409,16 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
           // Driver verified the pickup OTP — trip is officially under way.
           // Replace so back-press doesn't return the user to the pre-ride
           // tracking screen mid-trip.
-          navigation.replace('InRide', { rideId });
+          navigation.replace('InRide', {
+            rideId,
+            pickup,
+            dropoff,
+            rideType,
+            fare,
+            distance,
+            duration,
+            driver,
+          });
         }
         if (next === 'payment_pending' || next === 'completed') {
           // Driver ended the trip. Take the rider to the receipt — they
@@ -440,7 +461,7 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
     return () => {
       leaveRideRoom(rideId);
     };
-  }, [rideId, navigation, pickup, dropoff, rideType, fare, driver]);
+  }, [rideId, navigation, pickup, dropoff, rideType, fare, distance, duration, driver]);
 
   // Derived UI bits.
   const banner = STATUS_BANNER[status];
@@ -563,7 +584,13 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
       </View>
 
       {/* Driver Info Card */}
-      <ScrollView style={styles.bottomSection} contentContainerStyle={styles.bottomContent}>
+      <ScrollView
+        style={styles.bottomSection}
+        contentContainerStyle={[
+          styles.bottomContent,
+          { paddingBottom: insets.bottom + vs(24) },
+        ]}
+      >
         {/* To Pay + Vehicle Info */}
         <View style={styles.driverCard}>
           {/* To Pay */}

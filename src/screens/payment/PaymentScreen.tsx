@@ -204,7 +204,10 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ navigation }) => {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing['3xl'] }]}
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* ══════ CARDS SECTION ══════ */}
         <Text style={styles.sectionTitle}>Cards</Text>
@@ -312,7 +315,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ navigation }) => {
       <Modal visible={activeModal === 'card'} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior="padding" style={styles.modalSheet}>
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { paddingBottom: insets.bottom + Spacing['3xl'] }]}>
               <Text style={styles.modalTitle}>Add New Card</Text>
 
               {/* Card type toggle */}
@@ -363,7 +366,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ navigation }) => {
       {/* ══════ ADD UPI MODAL ══════ */}
       <Modal visible={activeModal === 'upi'} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + Spacing['3xl'] }]}>
             <Text style={styles.modalTitle}>Add UPI ID</Text>
             <Text style={styles.modalSubtitle}>Enter your UPI ID to make quick payments</Text>
 
@@ -384,7 +387,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({ navigation }) => {
       {/* ══════ LINK WALLET MODAL ══════ */}
       <Modal visible={activeModal === 'wallet'} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + Spacing['3xl'] }]}>
             <Text style={styles.modalTitle}>Link Wallet</Text>
             <Text style={styles.modalSubtitle}>Select a wallet to link for quick payments</Text>
 

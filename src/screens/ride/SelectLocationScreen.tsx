@@ -452,7 +452,12 @@ export const SelectLocationScreen: React.FC<SelectLocationScreenProps> = ({
       </View>
 
       {/* ── Bottom Sheet ── */}
-      <View style={styles.bottomSheet}>
+      <View
+        style={[
+          styles.bottomSheet,
+          { paddingBottom: insets.bottom + vs(Spacing.lg) },
+        ]}
+      >
         <View style={styles.handle} />
 
         {/* Ride Type Tabs */}

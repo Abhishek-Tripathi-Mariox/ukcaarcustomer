@@ -117,7 +117,10 @@ export const LoyaltyScreen: React.FC<LoyaltyScreenProps> = ({ navigation }) => {
         </View>
       ) : (
         <KeyboardAwareScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + vs(Spacing['3xl']) },
+          ]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {/* Points card */}

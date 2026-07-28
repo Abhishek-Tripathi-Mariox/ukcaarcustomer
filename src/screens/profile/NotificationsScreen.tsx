@@ -187,7 +187,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
         data={notifications}
         renderItem={renderNotification}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + vs(Spacing['3xl']) }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[Colors.primary]} />
         }

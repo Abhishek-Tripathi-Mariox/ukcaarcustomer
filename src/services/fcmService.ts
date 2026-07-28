@@ -139,11 +139,30 @@ export async function resyncFcmTokenIfPending(): Promise<void> {
   }
 }
 
-export async function clearFcmToken(): Promise<void> {
+/**
+ * Logout cleanup. Removes this device's token from the user's `fcmTokens`
+ * array server-side, then invalidates the local Firebase token so a
+ * re-login mints a fresh one and re-registers cleanly.
+ *
+ * MUST run before clearTokens() — the axios interceptor can only attach the
+ * Authorization header while the access token is still in storage. Called
+ * afterwards, the DELETE goes out unauthenticated, 401s, and the token stays
+ * on the user record, so pushes keep landing on a logged-out phone.
+ *
+ * `serverSide=false` (post account-deletion) skips the network call: the
+ * account and its token are already gone, so only local state needs clearing.
+ */
+export async function clearFcmToken(serverSide = true): Promise<void> {
   try {
-    const token = await AsyncStorage.getItem(FCM_TOKEN_KEY);
-    if (token) {
-      await api.delete('/notifications/fcm-token', { data: { token } }).catch(() => {});
+    if (serverSide) {
+      const token = await AsyncStorage.getItem(FCM_TOKEN_KEY);
+      if (token) {
+        try {
+          await api.delete('/notifications/fcm-token', { data: { token } });
+        } catch (err) {
+          console.warn('[fcm] server unregister failed (continuing):', err);
+        }
+      }
     }
     await messaging().deleteToken();
   } finally {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollViewProps, StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import { ScrollViewProps, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { KeyboardAwareScrollView as KASV } from 'react-native-keyboard-aware-scroll-view';
 
 interface KeyboardAwareScrollViewProps extends ScrollViewProps {
@@ -27,6 +27,14 @@ interface KeyboardAwareScrollViewProps extends ScrollViewProps {
  *   - `extraHeight`            → leaves room so the entire box clears the
  *                                keyboard, not just its bottom edge
  * `keyboardShouldPersistTaps="handled"` keeps buttons tappable while typing.
+ *
+ * BOTTOM PADDING: this library does NOT honour `contentContainerStyle`'s
+ * `paddingBottom` — confirmed on device, where Help & Support's "Submit Report"
+ * button stayed half under the navigation bar at maximum scroll even though the
+ * padding was set. So we strip paddingBottom out of the style and render it as a
+ * real spacer View after the children, which the library cannot swallow. Call
+ * sites keep passing `contentContainerStyle={{ paddingBottom: insets.bottom + N }}`
+ * exactly as before; every screen using this wrapper gets the fix for free.
  */
 export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = ({
   children,
@@ -35,10 +43,17 @@ export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = (
   extraHeight = 130,
   ...scrollProps
 }) => {
+  const flat = (StyleSheet.flatten(contentContainerStyle) ?? {}) as ViewStyle;
+  const rawTail = flat.paddingBottom;
+  const tailHeight = typeof rawTail === 'number' ? rawTail : 0;
+  // Pass the rest of the style through minus paddingBottom, so the spacer is the
+  // single source of tail space (no doubled gap if the library ever honours it).
+  const { paddingBottom: _paddingBottom, ...contentStyle } = flat;
+
   return (
     <KASV
       style={[styles.flex, containerStyle]}
-      contentContainerStyle={contentContainerStyle}
+      contentContainerStyle={contentStyle}
       enableOnAndroid
       enableAutomaticScroll
       extraHeight={extraHeight}
@@ -49,6 +64,7 @@ export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = (
       {...scrollProps}
     >
       {children}
+      {tailHeight > 0 ? <View style={{ height: tailHeight }} /> : null}
     </KASV>
   );
 };

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
-  Image,
   Share,
   Linking,
   Alert,
@@ -27,14 +26,13 @@ import Svg, {
   Ellipse,
   G,
 } from 'react-native-svg';
+// Share icons come from Ionicons, NOT from assets/refer-earn/*.png — those PNGs
+// exist but are blank solid-white placeholders (the real artwork only survives as
+// *.svg.bak), so they rendered as empty white blocks.
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { BackArrowIcon } from '@/components/icons/ProfileIcons';
 import { authService } from '@/services/authService';
 import { appSettingsService } from '@/services/appSettingsService';
-
-const whatsappIcon = require('../../../assets/refer-earn/whatsapp.png');
-const facebookIcon = require('../../../assets/refer-earn/facebook.png');
-const telegramIcon = require('../../../assets/refer-earn/telegram.png');
-const shareIcon = require('../../../assets/refer-earn/share.png');
 
 interface ReferEarnScreenProps {
   navigation: any;
@@ -48,18 +46,37 @@ const buildReferralMessage = (code: string, bonus: number) =>
     ? `Hey! Book your rides with UKCAAR and get ₹${bonus} bonus. Use my referral code: ${code}`
     : `Hey! Book your rides with UKCAAR. Use my referral code: ${code}`;
 
-// Three-step illustration: person meditating → phone (recharge) → wallet with coins
-const ReferIllustration: React.FC = () => (
-  <Svg width="100%" height={136} viewBox="0 0 370 136" fill="none">
+// Gradient card that sits BEHIND the illustration and its step labels. Split out
+// of ReferIllustration so the artwork and the labels can be stacked with flex —
+// previously the labels were absolutely positioned over the figures.
+const IllustrationCard: React.FC = () => (
+  <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
     <Defs>
-      <LinearGradient id="bg" x1="0" y1="0" x2="370" y2="0" gradientUnits="userSpaceOnUse">
+      {/* objectBoundingBox (0..1) rather than userSpaceOnUse: this Svg has no
+          viewBox, so its user space is the runtime pixel size of the card. */}
+      <LinearGradient
+        id="referCardBg"
+        x1="0"
+        y1="0"
+        x2="1"
+        y2="0"
+        gradientUnits="objectBoundingBox"
+      >
         <Stop offset="0" stopColor="#FFB547" />
         <Stop offset="0.5" stopColor="#FEFEF9" />
         <Stop offset="1" stopColor="#FFB547" />
       </LinearGradient>
     </Defs>
-    <Rect x="0" y="0" width="370" height="136" rx="15" fill="url(#bg)" />
+    <Rect x="0" y="0" width="100%" height="100%" rx="15" fill="url(#referCardBg)" />
+  </Svg>
+);
 
+// Three-step illustration: person meditating → phone (recharge) → wallet with coins.
+// Figures only; the viewBox is cropped to the artwork so the labels below it get
+// their own row. Figure centres (x ≈ 58 / 185 / 310 of 370) line up with the
+// three space-around labels.
+const ReferIllustration: React.FC = () => (
+  <Svg width="100%" height={118} viewBox="0 0 370 118" fill="none">
     {/* Dotted connector lines */}
     <G opacity={0.7}>
       {[0, 1, 2, 3, 4, 5, 6].map((i) => (
@@ -318,6 +335,7 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
 
         {/* Illustration card */}
         <View style={styles.illustrationWrap}>
+          <IllustrationCard />
           <ReferIllustration />
           <View style={styles.illustrationLabels}>
             <Text style={styles.stepLabel}>{'Invite your\nFriend'}</Text>
@@ -355,13 +373,14 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
         {/* Social icons row */}
         <View style={styles.socialRow}>
           <TouchableOpacity onPress={() => shareGeneric('fb://')} activeOpacity={0.8}>
-            <Image source={facebookIcon} style={styles.socialIcon} />
+            <Ionicons name="logo-facebook" size={30} color="#1877F2" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => shareGeneric('tg://msg?text=')} activeOpacity={0.8}>
-            <Image source={telegramIcon} style={styles.socialIcon} />
+            {/* Ionicons has no Telegram logo; its paper-plane reads the same way. */}
+            <Ionicons name="paper-plane" size={28} color="#229ED9" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => shareGeneric()} activeOpacity={0.8}>
-            <Image source={shareIcon} style={styles.socialIcon} />
+            <Ionicons name="share-social" size={28} color="#0097B3" />
           </TouchableOpacity>
         </View>
 
@@ -371,7 +390,7 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
           onPress={shareWhatsApp}
           activeOpacity={0.85}
         >
-          <Image source={whatsappIcon} style={styles.whatsappIcon} />
+          <Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" />
           <Text style={styles.whatsappText}>Refer Via Whatsapp</Text>
         </TouchableOpacity>
 
@@ -557,15 +576,15 @@ const styles = StyleSheet.create({
   illustrationWrap: {
     width: '100%',
     marginTop: 4,
+    borderRadius: 15,
+    overflow: 'hidden',
+    paddingBottom: 12,
   },
   illustrationLabels: {
-    position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingHorizontal: 10,
+    marginTop: 2,
   },
   stepLabel: {
     fontFamily: 'Inter-Regular',
@@ -630,13 +649,9 @@ const styles = StyleSheet.create({
   },
   socialRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 18,
     marginTop: 16,
-  },
-  socialIcon: {
-    width: 30,
-    height: 30,
-    resizeMode: 'contain',
   },
   whatsappBtn: {
     marginTop: 24,
@@ -653,11 +668,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.52,
     shadowRadius: 4,
     elevation: 3,
-  },
-  whatsappIcon: {
-    width: 21,
-    height: 24,
-    resizeMode: 'contain',
   },
   whatsappText: {
     fontFamily: 'Inter-Regular',

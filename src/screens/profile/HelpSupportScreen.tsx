@@ -305,6 +305,7 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({ navigation
             {submitting ? 'Submitting…' : 'Submit Report'}
           </Text>
         </TouchableOpacity>
+
       </KeyboardAwareScrollView>
     </View>
   );

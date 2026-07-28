@@ -25,6 +25,24 @@ interface LoyaltyScreenProps {
   navigation: any;
 }
 
+const REDEEM_FALLBACK = 'Could not redeem this reward. Please try again.';
+
+/**
+ * Show the server's message only when it reads like customer-facing copy.
+ * Anything long, or carrying database/stack/HTML fingerprints, is an internal
+ * error that leaked through and must never be rendered.
+ */
+const redeemErrorMessage = (err: any): string => {
+  const raw = err?.response?.data?.message;
+  if (typeof raw !== 'string') return REDEEM_FALLBACK;
+  const msg = raw.trim();
+  if (!msg || msg.length > 120) return REDEEM_FALLBACK;
+  if (/cast to |at path|validation failed|E11000|mongo|ECONN|<[a-z!]/i.test(msg)) {
+    return REDEEM_FALLBACK;
+  }
+  return msg;
+};
+
 export const LoyaltyScreen: React.FC<LoyaltyScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -85,7 +103,7 @@ export const LoyaltyScreen: React.FC<LoyaltyScreenProps> = ({ navigation }) => {
             }
             await load();
           } catch (err: any) {
-            Alert.alert('Redeem failed', err?.response?.data?.message || 'Please try again.');
+            Alert.alert('Redeem failed', redeemErrorMessage(err));
           } finally {
             setRedeeming(null);
           }
@@ -158,7 +176,7 @@ export const LoyaltyScreen: React.FC<LoyaltyScreenProps> = ({ navigation }) => {
                 </View>
               </View>
             ) : (
-              <Text style={styles.progressText}>You're at the top tier 🎉</Text>
+              <Text style={styles.progressText}>You're at the top tier</Text>
             )}
           </View>
 

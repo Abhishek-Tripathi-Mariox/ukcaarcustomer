@@ -166,6 +166,17 @@ export const authService = {
   // account deletion, where the token is already invalidated server-side so the
   // call would 401 (and trip the global 401→refresh interceptor for nothing).
   logout: async (serverSide = true) => {
+    // Unregister this device's push token FIRST — before /auth/logout and
+    // before clearTokens(), while the access token is still in storage for
+    // the interceptor to attach. Run after clearTokens() (as it used to be)
+    // the DELETE is unauthenticated, 401s, and the token stays on the user
+    // record — a logged-out rider keeps receiving pushes.
+    try {
+      const { clearFcmToken } = await import('./fcmService');
+      await clearFcmToken(serverSide);
+    } catch (err) {
+      console.warn('[logout] fcm clear failed (continuing):', err);
+    }
     try {
       if (serverSide) await api.post('/auth/logout');
     } catch (err) {
@@ -176,16 +187,6 @@ export const authService = {
       console.warn('[logout] server logout failed (continuing):', err);
     } finally {
       await clearTokens();
-      // Clear the cached FCM token too. Otherwise a second user logging
-      // in on the same device skips token re-registration (the `synced`
-      // flag is true from the previous session) and the backend keeps
-      // pushes pointed at the previous user's record.
-      try {
-        const { clearFcmToken } = await import('./fcmService');
-        await clearFcmToken();
-      } catch (err) {
-        console.warn('[logout] fcm clear failed (continuing):', err);
-      }
     }
   },
 };

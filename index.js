@@ -1,4 +1,5 @@
 import { AppRegistry, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import App from './App';
@@ -29,6 +30,14 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 // reliably wakes this headless handler, which then renders via Notifee.
 messaging().setBackgroundMessageHandler(async (remoteMessage) => {
   if (Platform.OS !== 'android') return;
+
+  // Logged-out guard. Logout unregisters this device's token server-side,
+  // but that call can fail (logout with no network), leaving the backend
+  // still pushing here. No session on this phone means nothing to notify.
+  // Key must match the one used in src/services/api.ts.
+  try {
+    if (!(await AsyncStorage.getItem('accessToken'))) return;
+  } catch {}
 
   await notifee.createChannel({
     id: DEFAULT_CHANNEL_ID,

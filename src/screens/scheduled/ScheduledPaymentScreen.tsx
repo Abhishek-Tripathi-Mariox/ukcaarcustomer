@@ -23,6 +23,29 @@ import { setWalletBalance as setGlobalWalletBalance } from '@/store/slices/appSl
 
 interface Stop { id: string; name: string; time: string; sequence?: number }
 
+/**
+ * Mirrors the server's default bookingCutoffMinutes — seat booking closes
+ * this many minutes before departure. Only a fallback: when the route carries
+ * an admin override (route.bookingCutoffMinutes, threaded from routeToUi) that
+ * wins, otherwise a route with a higher cutoff sails through this gate and the
+ * rider is charged for a booking the backend then rejects.
+ */
+const BOOKING_CUTOFF_MIN = 10;
+
+// Stop times arrive as the 12-hour picker label ("5:30 PM"); tolerate a raw
+// 24h "HH:mm" too. Returns null when unparseable.
+const parseTimeLabel = (label?: string): { h: number; m: number } | null => {
+  const t = (label ?? '').trim();
+  const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(t);
+  if (ampm) {
+    let h = Number(ampm[1]) % 12;
+    if (/pm/i.test(ampm[3])) h += 12;
+    return { h, m: Number(ampm[2]) };
+  }
+  const raw = /^(\d{1,2}):(\d{2})$/.exec(t);
+  return raw ? { h: Number(raw[1]), m: Number(raw[2]) } : null;
+};
+
 interface Props {
   navigation: any;
   route: {
@@ -64,11 +87,75 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
   const user = useAppSelector((s) => s.auth.user);
   const walletBalance = useAppSelector((s) => s.app.walletBalance);
 
+  // The route's real cutoff (admin override) when it made it through the nav
+  // params; the platform default otherwise. The server recheck below covers
+  // the cases where even this is stale.
+  const bookingCutoffMin = scheduledRoute.bookingCutoffMinutes ?? BOOKING_CUTOFF_MIN;
+
+  // The rider can sit on this screen while the departure closes underneath
+  // them. Recompute bookability at the moment they tap Pay — the departure
+  // instant is anchored to IST (+05:30) exactly like the backend — and bail
+  // out before any money moves once inside the booking cutoff.
+  const isDepartureStillBookable = (): boolean => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(departureDate ?? '')) return true;
+    const t = parseTimeLabel(boarding?.time);
+    if (!t) return true; // unparseable time — let the server enforce the cutoff
+    const departMs = Date.parse(
+      `${departureDate}T${String(t.h).padStart(2, '0')}:${String(t.m).padStart(2, '0')}:00+05:30`,
+    );
+    if (Number.isNaN(departMs)) return true;
+    return departMs - Date.now() > bookingCutoffMin * 60 * 1000;
+  };
+
   const handlePay = async () => {
     if (paying) return;
+    if (!isDepartureStillBookable()) {
+      Alert.alert(
+        'Departure Closed',
+        'This departure has closed. Please pick a later slot.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }],
+      );
+      return;
+    }
     setPaying(true);
+    // True once Razorpay has actually taken the money, so the catch can tell
+    // "never charged" apart from "charged but the booking didn't complete".
+    let checkoutSucceeded = false;
 
     try {
+      // ── 0. Authoritative server-side recheck BEFORE any money moves ──
+      // The clock math above only knows what this device knows. The seats
+      // endpoint re-runs the backend's own past/closed/non-operating/cutoff
+      // checks (including admin overrides applied after this flow started)
+      // and returns a human `message` when the slot is no longer bookable.
+      // It also returns the live booked list, so a seat grabbed since the
+      // seat screen is caught here rather than after the charge.
+      try {
+        const check = await routeService.getSeats(scheduledRoute.id, {
+          date: departureDate,
+          departureIndex,
+          driverId,
+        });
+        if (check.message) {
+          Alert.alert('Departure Unavailable', check.message, [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+          return;
+        }
+        const taken = seats.filter((n) => (check.booked ?? []).includes(n));
+        if (taken.length > 0) {
+          Alert.alert(
+            'Seats Unavailable',
+            `Seat(s) ${taken.join(', ')} were just reserved by another rider. Please pick different seats.`,
+            [{ text: 'Pick again', onPress: () => navigation.goBack() }],
+          );
+          return;
+        }
+      } catch {
+        // Couldn't reach the availability endpoint — proceed and let the
+        // booking endpoint enforce (it always does); don't block a
+        // legitimate payment on a failed pre-check.
+      }
       // ── 1. Pay via UKCAAR Wallet Balance ──
       if (paymentMode === 'wallet') {
         if (walletBalance < total) {
@@ -173,6 +260,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
       };
 
       const paymentData = await RazorpayCheckout.open(options as any);
+      checkoutSucceeded = true;
 
       const verifyRes = await paymentService.verifyPayment({
         razorpay_order_id: orderId,
@@ -181,7 +269,12 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
       });
 
       if (!verifyRes.success) {
-        Alert.alert('Payment Verification Failed', 'Could not verify your online payment.');
+        // The checkout sheet reported success, so money may genuinely have
+        // left the rider's account — never imply they weren't charged.
+        Alert.alert(
+          'Payment Received',
+          'Your payment was received but we could not verify it yet, so the booking was not completed. If the amount was debited, our support team will complete the booking or process your refund.',
+        );
         return;
       }
 
@@ -226,14 +319,31 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
             [{ text: 'Pick again', onPress: () => navigation.goBack() }],
           );
         } else {
+          // The rider HAS paid — the alert must say so before anything else,
+          // with the server's business message when there is one (never a raw
+          // transport error).
+          const serverMsg =
+            typeof bd?.message === 'string' && bd.message
+              ? bd.message
+              : 'the reservation could not be confirmed';
           Alert.alert(
-            'Booking Error',
-            bd?.message || bookErr?.message || 'Payment succeeded but seat reservation encountered an issue. Support team has been notified.',
+            'Payment Received',
+            `Your payment was received but the booking could not be completed: ${serverMsg}. Our support team will process your refund.`,
           );
         }
       }
     } catch (err: any) {
-      if (err?.code !== 2 && err?.code !== '2') {
+      if (err?.code === 2 || err?.code === '2') {
+        // Rider closed the Razorpay sheet on purpose — stay silent.
+      } else if (checkoutSucceeded) {
+        // Charged, then something after the checkout failed (verify call
+        // threw, network dropped). Money may have left their account —
+        // don't claim the payment was "cancelled".
+        Alert.alert(
+          'Payment Received',
+          'Your payment was received but the booking could not be completed. Our support team will complete the booking or process your refund.',
+        );
+      } else {
         Alert.alert(
           'Payment Cancelled',
           err?.description || err?.message || 'Payment flow was stopped.',

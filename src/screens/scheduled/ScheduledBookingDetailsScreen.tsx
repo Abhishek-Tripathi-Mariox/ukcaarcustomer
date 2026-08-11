@@ -40,6 +40,39 @@ interface Props {
   };
 }
 
+/**
+ * Mirrors the server's default cancellationCutoffMinutes — cancellation
+ * closes this many minutes before departure. Same gate + copy as the
+ * Trip Hub so the two cancel entry points behave identically.
+ */
+const CANCEL_CUTOFF_MIN = 60;
+
+// Stop times arrive as the 12-hour picker label ("5:30 PM"); tolerate a raw
+// 24h "HH:mm" too. Returns null when unparseable.
+const parseTimeLabel = (label?: string): { h: number; m: number } | null => {
+  const t = (label ?? '').trim();
+  const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(t);
+  if (ampm) {
+    let h = Number(ampm[1]) % 12;
+    if (/pm/i.test(ampm[3])) h += 12;
+    return { h, m: Number(ampm[2]) };
+  }
+  const raw = /^(\d{1,2}):(\d{2})$/.exec(t);
+  return raw ? { h: Number(raw[1]), m: Number(raw[2]) } : null;
+};
+
+// Epoch ms of the booked departure, anchored to IST (+05:30) exactly like
+// the backend. Null when the params don't carry a parseable date + time.
+const departureEpochMsOf = (dateStr?: string, timeLabel?: string): number | null => {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const t = parseTimeLabel(timeLabel);
+  if (!t) return null;
+  const ms = Date.parse(
+    `${dateStr}T${String(t.h).padStart(2, '0')}:${String(t.m).padStart(2, '0')}:00+05:30`,
+  );
+  return Number.isNaN(ms) ? null : ms;
+};
+
 // Format a YYYY-MM-DD into "Sunday, January 18, 2026". Falls back to
 // today only if the booking flow somehow didn't carry a date through.
 const formatDepartureDate = (iso?: string): string => {
@@ -76,7 +109,33 @@ export const ScheduledBookingDetailsScreen: React.FC<Props> = ({ navigation, rou
   // default was a leftover demo.
   const seatLabel = seats.length > 0 ? seats.map((s) => `Seat ${s}`).join(', ') : '—';
 
+  // Cancellation gate — same CANCEL_CUTOFF_MIN as the Trip Hub. When the
+  // departure instant can't be derived (older nav path), leave the gate open
+  // and let the server enforce the cutoff.
+  const cancelDeadlineMs = (() => {
+    const departMs = departureEpochMsOf(departureDate, boarding?.time);
+    return departMs != null ? departMs - CANCEL_CUTOFF_MIN * 60000 : null;
+  })();
+  const cancelOpen = cancelDeadlineMs == null || Date.now() < cancelDeadlineMs;
+  const cancelDeadlineLabel =
+    cancelDeadlineMs != null
+      ? new Date(cancelDeadlineMs).toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
+
   const handleCancel = () => {
+    // Re-check at tap time — the rider may have kept this screen open past
+    // the cutoff.
+    if (cancelDeadlineMs != null && Date.now() >= cancelDeadlineMs) {
+      Alert.alert(
+        'Cancellation Closed',
+        `Cancellation closed (until ${CANCEL_CUTOFF_MIN} minutes before departure).`,
+      );
+      return;
+    }
     if (!bookingId) {
       // No persisted booking id to act on (older nav path) — just send the
       // rider home; they can cancel from the Activity tab where the id is known.
@@ -99,8 +158,14 @@ export const ScheduledBookingDetailsScreen: React.FC<Props> = ({ navigation, rou
             Alert.alert('Cancelled', 'Your scheduled ride has been cancelled.', [
               { text: 'OK', onPress: handleGoHome },
             ]);
-          } catch {
-            Alert.alert('Error', 'Failed to cancel. Please try again.');
+          } catch (err: any) {
+            // Surface the server's business message (e.g. the cancellation
+            // window has closed) — never a raw/internal error.
+            const msg =
+              typeof err?.response?.data?.message === 'string'
+                ? err.response.data.message
+                : 'Failed to cancel. Please try again.';
+            Alert.alert('Error', msg);
           } finally {
             setCancelling(false);
           }
@@ -240,17 +305,30 @@ export const ScheduledBookingDetailsScreen: React.FC<Props> = ({ navigation, rou
           <Text style={styles.trackText}>View Trip Status</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.cancelBtn, cancelling && { opacity: 0.6 }]}
-          onPress={handleCancel}
-          disabled={cancelling}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.cancelText}>{cancelling ? 'Cancelling…' : 'Cancel Ride'}</Text>
-        </TouchableOpacity>
+        {cancelOpen ? (
+          <>
+            <TouchableOpacity
+              style={[styles.cancelBtn, cancelling && { opacity: 0.6 }]}
+              onPress={handleCancel}
+              disabled={cancelling}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.cancelText}>{cancelling ? 'Cancelling…' : 'Cancel Ride'}</Text>
+            </TouchableOpacity>
+            <Text style={styles.cancelNote}>
+              {cancelDeadlineLabel
+                ? `Free cancellation until ${cancelDeadlineLabel}`
+                : `Free cancellation until ${CANCEL_CUTOFF_MIN} minutes before departure`}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.cancelNote}>
+            Cancellation closed (until {CANCEL_CUTOFF_MIN} minutes before departure).
+          </Text>
+        )}
 
         <View style={styles.reminderBanner}>
-          <Text style={styles.reminderText}>💡 We'll remind you before departure</Text>
+          <Text style={styles.reminderText}>We'll remind you before departure</Text>
         </View>
 
         <TouchableOpacity
@@ -433,6 +511,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     fontSize: fs(14),
     color: Colors.error,
+  },
+  cancelNote: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: vs(8),
   },
 
   reminderBanner: {

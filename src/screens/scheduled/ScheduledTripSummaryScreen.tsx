@@ -144,13 +144,17 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
   const departureIso =
     params.departureDate ?? (ride as any)?.scheduledAt ?? ride?.createdAt;
   const dateLabel = formatDate(departureIso);
+  // Business times are IST — anchor the clock to Asia/Kolkata so a non-IST
+  // device shows the same time the booking was made for. A bare YYYY-MM-DD
+  // carries no time at all, so show a dash instead of a fabricated midnight.
   const depTime =
     params.boarding?.time ??
-    (departureIso
+    (departureIso && !/^\d{4}-\d{2}-\d{2}$/.test(String(departureIso))
       ? new Date(departureIso).toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true,
+          timeZone: 'Asia/Kolkata',
         })
       : '—');
 

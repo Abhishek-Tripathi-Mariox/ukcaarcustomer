@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow, alpha } from '@/theme';
@@ -29,6 +30,14 @@ interface Props {
   navigation: any;
   route: { params: { route: ScheduledRoute } };
 }
+
+/**
+ * Mirrors the server's default bookingCutoffMinutes — seat booking closes
+ * this many minutes before a departure slot. Only a fallback: once the route
+ * doc loads, the route-level override (schedule.bookingCutoffMinutes) wins so
+ * the picker filters with the same cutoff the backend enforces.
+ */
+const BOOKING_CUTOFF_MIN = 10;
 
 /**
  * Step 2 of the scheduled booking flow. The previous version rendered a
@@ -134,49 +143,106 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
     [routeDoc],
   );
 
+  // Live clock. Previously today/now were memoized once at mount, so a rider
+  // who lingered on this screen could still book a slot that had already
+  // departed. Refreshed every 30 seconds and whenever the screen regains focus.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(tick);
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      setNow(new Date());
+    }, []),
+  );
+
+  // 14-day chip strip anchored to IST civil dates: chip i is the IST date of
+  // (now + i days). Labels derive from that same IST value — the previous
+  // version mixed DEVICE-local midnight with IST conversions, so a non-IST
+  // device could label the wrong civil date as "Today".
   const dateOptions = useMemo(() => {
     const out: { date: string; label: string }[] = [];
-    const base = new Date();
-    base.setHours(0, 0, 0, 0);
     for (let i = 0; i < 14; i++) {
-      const d = new Date(base.getTime() + i * 86400000);
-      out.push({
-        date: istDateStr(d),
-        label:
-          i === 0
-            ? 'Today'
-            : i === 1
-              ? 'Tomorrow'
-              : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }),
-      });
+      const date = istDateStr(new Date(now.getTime() + i * 86400000));
+      let label: string;
+      if (i === 0) {
+        label = 'Today';
+      } else if (i === 1) {
+        label = 'Tomorrow';
+      } else {
+        // Format the IST civil date itself, UTC-anchored so the device
+        // timezone cannot shift it to a neighbouring day.
+        label = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-IN', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          timeZone: 'UTC',
+        });
+      }
+      out.push({ date, label });
     }
     return out;
-  }, []);
+  }, [now]);
 
   const [selectedDate, setSelectedDate] = useState(departureMeta.date);
   const [selectedIndex, setSelectedIndex] = useState(departureMeta.index);
 
-  const todayStr = useMemo(() => istDateStr(), []);
-  const nowMin = useMemo(() => istMinutesOfDay(), []);
+  const todayStr = istDateStr(now);
+  const nowMin = istMinutesOfDay(now);
 
-  // For the chosen date, hide slots that have already passed (only matters for today).
+  // Route-level cutoff override once the doc loads; platform default until
+  // then. This is the same number the backend enforces at booking time.
+  const bookingCutoffMin =
+    routeDoc?.schedule?.bookingCutoffMinutes ?? BOOKING_CUTOFF_MIN;
+
+  // Cross-midnight orphan chip: the 14-day strip rebuilds off the live clock,
+  // so past IST midnight the previously selected chip becomes "yesterday" and
+  // vanishes from the strip — leaving a selection no chip represents. Snap
+  // back to the first chip (today). YYYY-MM-DD compares lexicographically.
+  useEffect(() => {
+    if (selectedDate < todayStr) setSelectedDate(todayStr);
+  }, [selectedDate, todayStr]);
+
+  // For the chosen date, hide slots that have already departed OR fall inside
+  // the booking cutoff window (only matters for today).
   const availableSlots = useMemo(
     () =>
       sortedDepartures.filter((s) => {
         if (selectedDate !== todayStr) return true;
         const [h, m] = s.time.split(':').map(Number);
-        return h * 60 + m > nowMin;
+        return h * 60 + m > nowMin + bookingCutoffMin;
       }),
-    [sortedDepartures, selectedDate, todayStr, nowMin],
+    [sortedDepartures, selectedDate, todayStr, nowMin, bookingCutoffMin],
   );
 
-  // Keep the selected slot valid whenever the available set changes.
+  // Keep the selected slot valid whenever the available set changes. When the
+  // live-clock cutoff filter closes the slot the rider had picked, move to
+  // the next one and SAY so briefly — a silent switch books a different
+  // departure than the rider thinks they chose. The ref suppresses the notice
+  // for the initial seeding when the schedule first loads.
+  const slotSeededRef = useRef(false);
+  const [slotMovedNotice, setSlotMovedNotice] = useState<string | null>(null);
   useEffect(() => {
     if (availableSlots.length === 0) return;
     if (!availableSlots.some((s) => s.index === selectedIndex)) {
-      setSelectedIndex(availableSlots[0].index);
+      const next = availableSlots[0];
+      setSelectedIndex(next.index);
+      if (slotSeededRef.current) {
+        setSlotMovedNotice(
+          `That departure just closed for booking — switched to ${fmt12h(next.time)}.`,
+        );
+      }
     }
+    slotSeededRef.current = true;
   }, [availableSlots, selectedIndex]);
+
+  // The notice is transient — fade it out after a few seconds.
+  useEffect(() => {
+    if (!slotMovedNotice) return;
+    const t = setTimeout(() => setSlotMovedNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [slotMovedNotice]);
 
   const selectedTime =
     sortedDepartures.find((s) => s.index === selectedIndex)?.time ?? departureMeta.time;
@@ -240,6 +306,12 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
     if (!boarding || !dropping) return;
     if (availableSlots.length === 0) {
       Alert.alert('Pick a date', 'No departures remain for the selected date. Please choose another date.');
+      return;
+    }
+    // The selected slot may have crossed the booking cutoff while the rider
+    // was deciding — the live clock refilters, this guards the render gap.
+    if (!availableSlots.some((sl) => sl.index === selectedIndex)) {
+      Alert.alert('Departure Closed', 'This departure has closed. Please pick a later slot.');
       return;
     }
 
@@ -400,6 +472,12 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
               })}
             </ScrollView>
           )}
+          {slotMovedNotice && (
+            <Text style={styles.slotMovedNotice}>{slotMovedNotice}</Text>
+          )}
+          <Text style={styles.cutoffNote}>
+            Bookings close {bookingCutoffMin} minutes before departure.
+          </Text>
 
           <View style={[styles.sectionHead, { marginTop: 18 }]}>
             <Ionicons name="bus" size={18} color={Colors.textPrimary} />
@@ -534,6 +612,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: vs(16),
     paddingHorizontal: s(12),
+  },
+
+  cutoffNote: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textMuted,
+    marginTop: vs(8),
+  },
+
+  slotMovedNotice: {
+    fontFamily: 'Inter-Medium',
+    fontSize: fs(12),
+    color: Colors.warning,
+    marginTop: vs(8),
   },
 
   chipRow: { gap: s(8), paddingVertical: vs(2), paddingRight: s(8) },

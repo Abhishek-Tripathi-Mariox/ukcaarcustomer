@@ -81,6 +81,11 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Server explanation for a slot that cannot be booked (closed / past /
+  // non-operating date). The seat payload arrives with an EMPTY booked list
+  // then — without this state a closed slot would render every seat as free
+  // and let the rider march on to payment.
+  const [closedMessage, setClosedMessage] = useState<string | null>(null);
 
   const loadSeats = useCallback(async () => {
     try {
@@ -92,6 +97,12 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
       });
       setTotalSeats(data.totalSeats || 0);
       setBookedSet(new Set(data.booked || []));
+      setClosedMessage(data.message ?? null);
+      if (data.message) {
+        // Nothing on this slot is selectable any more.
+        setSelected(new Set());
+        return;
+      }
       // Drop any seats from the local selection that just became taken
       // (someone else grabbed them while this screen was open).
       setSelected((prev) => {
@@ -125,6 +136,7 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
   const selectCap = seatsNeeded || totalSeats || Infinity;
 
   const toggleSeat = (num: number) => {
+    if (closedMessage) return;
     if (bookedSet.has(num)) return;
     const next = new Set(selected);
     if (next.has(num)) {
@@ -222,6 +234,22 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity onPress={onRefresh} style={styles.retryBtn} activeOpacity={0.85}>
             <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : closedMessage ? (
+        // Closed / past / non-operating slot — the booked list arrives empty,
+        // so rendering the grid here would show ALL SEATS FREE for a trip
+        // nobody can book. Show the server's explanation and route the rider
+        // back to pick another slot instead.
+        <View style={styles.loadingWrap}>
+          <Ionicons name="time-outline" size={s(40)} color={Colors.textMuted} />
+          <Text style={[styles.errorText, { marginTop: vs(12) }]}>{closedMessage}</Text>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.retryBtn}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.retryText}>Pick Another Slot</Text>
           </TouchableOpacity>
         </View>
       ) : totalSeats === 0 ? (

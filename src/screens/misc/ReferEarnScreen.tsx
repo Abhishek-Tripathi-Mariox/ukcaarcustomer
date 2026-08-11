@@ -14,6 +14,8 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Clipboard,
+  ToastAndroid,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, {
@@ -258,14 +260,17 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
     }
   };
 
-  const copyCode = async () => {
+  const copyCode = () => {
     if (!referralCode) return;
-    try {
-      await Share.share({ message: referralCode });
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // user cancelled
+    // Actually copy — this used to open the SHARE SHEET and then claim
+    // "copied", so nothing ever landed on the clipboard. RN core's Clipboard
+    // is deprecated in favour of the community package but still ships with
+    // 0.73, so no new native dependency is needed.
+    Clipboard.setString(referralCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('Referral code copied', ToastAndroid.SHORT);
     }
   };
 
@@ -291,7 +296,10 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
           return;
         }
       }
-      await Share.share({ message: referralMessage });
+      // The generic Share tile copies the code directly instead of opening
+      // the OS share panel (client request). Channel tiles above still deep
+      // link to their apps.
+      copyCode();
     } catch {
       // user cancelled
     }

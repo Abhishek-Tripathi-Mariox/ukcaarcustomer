@@ -26,7 +26,8 @@ interface WalletTopUpScreenProps {
   navigation: any;
 }
 
-const GST_RATE = 0.18;
+// Mirrors the backend's WALLET_GST_RATE — GST removed from recharges.
+const GST_RATE = 0;
 
 interface Quote {
   denomination: number;
@@ -436,10 +437,14 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
               </Text>
             </View>
           )}
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>GST (18%)</Text>
-            <Text style={styles.detailValue}>₹ {quote?.gst ?? 0}</Text>
-          </View>
+          {/* GST removed from recharges — row only renders if the server ever
+              sends a non-zero gst again (old offers cached, rate reinstated). */}
+          {(quote?.gst ?? 0) > 0 && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>GST</Text>
+              <Text style={styles.detailValue}>₹ {quote?.gst ?? 0}</Text>
+            </View>
+          )}
           <View style={styles.dashedDivider} />
           <View style={styles.detailRow}>
             <Text style={styles.detailLabelTotal}>Total Amount</Text>

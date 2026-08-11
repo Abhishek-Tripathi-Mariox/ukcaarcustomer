@@ -89,6 +89,9 @@ export const ScheduledEarlyDropSummaryScreen: React.FC<Props> = ({ navigation, r
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
+            // Business times are IST — without this a non-IST device showed
+            // the drop time in its own timezone.
+            timeZone: 'Asia/Kolkata',
           })
         : null;
     } catch {

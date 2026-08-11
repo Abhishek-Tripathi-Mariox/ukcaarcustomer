@@ -33,6 +33,15 @@ const slides = [
     title: 'Schedule Rides in Advance',
     subtitle: 'Plan your trips easily — book a taxi for later and\nenjoy on-time pickups without the wait.',
   },
+  {
+    id: '3',
+    image: require('../../../assets/images/onboarding-safe.png'),
+    title: 'Safe & Reliable Every Time',
+    // The original copy here advertised "electricians, cleaners, beauticians"
+    // — home-services wording that belongs to a different product. Replaced
+    // with ride-safety copy that matches the heading and what UKCAAR does.
+    subtitle: 'Verified drivers, live trip tracking and\n24/7 support on every ride.',
+  },
 ];
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
@@ -210,10 +219,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: fs(24),
     letterSpacing: 0,
-    // The slide's 30px side padding left ~315px, but the longest authored line
-    // ("Electricians, cleaners, beauticians & more —") needs ~317px, so it
-    // overflowed by a hair and wrapped into a 3rd line. Reclaim 12px per side
-    // so each half of the "\n" break stays on one line as designed.
+    // The slide's 30px side padding leaves ~315px, which the longest authored
+    // line ("Plan your trips easily — book a taxi for later and") overruns by a
+    // hair, wrapping into an unintended 3rd line. Reclaim 12px per side so each
+    // half of the "\n" break stays on one line as designed.
     marginHorizontal: -s(Spacing.md),
   },
   bottomSection: {

@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  StatusBar,
-  Alert,
   ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
   RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { fs, s, vs } from '@/theme/responsive';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -50,6 +52,10 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Rows clamp long bodies to 2 lines; tapping opens the full notification
+  // in a detail popup (client request — better than inline expansion for
+  // long descriptions).
+  const [selected, setSelected] = useState<AppNotification | null>(null);
 
   // Mirror the local unread count into the store so the Home bell badge stays
   // in sync the moment the user reads, marks-all or clears notifications here.
@@ -125,7 +131,10 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
     return (
       <TouchableOpacity
         style={[styles.notifRow, !item.isRead && styles.notifUnread]}
-        onPress={() => !item.isRead && handleMarkAsRead(item._id)}
+        onPress={() => {
+          if (!item.isRead) handleMarkAsRead(item._id);
+          setSelected(item);
+        }}
         onLongPress={() => handleDelete(item._id)}
         activeOpacity={0.7}
       >
@@ -134,12 +143,17 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
         </View>
         <View style={styles.notifContent}>
           <View style={styles.notifHeader}>
-            <Text style={[styles.notifTitle, !item.isRead && styles.notifTitleUnread]} numberOfLines={1}>
+            <Text
+              style={[styles.notifTitle, !item.isRead && styles.notifTitleUnread]}
+              numberOfLines={1}
+            >
               {item.title}
             </Text>
             <Text style={styles.notifTime}>{timeAgo(item.createdAt)}</Text>
           </View>
-          <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
+          <Text style={styles.notifBody} numberOfLines={2}>
+            {item.body}
+          </Text>
         </View>
         {!item.isRead && <View style={styles.unreadDot} />}
       </TouchableOpacity>
@@ -203,6 +217,52 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
           </View>
         }
       />
+      {/* Full-notification popup — long descriptions get a scrollable panel
+          instead of being clamped to the 2-line row preview. */}
+      <Modal
+        visible={selected !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelected(null)}
+      >
+        <View style={styles.detailBackdrop}>
+          <View style={styles.detailCard}>
+            {selected && (
+              <>
+                <View style={styles.detailHeader}>
+                  <View
+                    style={[
+                      styles.notifIcon,
+                      { backgroundColor: (TYPE_CONFIG[selected.type] || TYPE_CONFIG.system).color + '18' },
+                    ]}
+                  >
+                    <Ionicons
+                      name={(TYPE_CONFIG[selected.type] || TYPE_CONFIG.system).icon as any}
+                      size={22}
+                      color={(TYPE_CONFIG[selected.type] || TYPE_CONFIG.system).color}
+                    />
+                  </View>
+                  <View style={styles.detailHeaderText}>
+                    <Text style={styles.detailTitle}>{selected.title}</Text>
+                    <Text style={styles.detailTime}>{timeAgo(selected.createdAt)}</Text>
+                  </View>
+                </View>
+                <ScrollView style={styles.detailBodyScroll} showsVerticalScrollIndicator>
+                  <Text style={styles.detailBody}>{selected.body}</Text>
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.detailCloseBtn}
+                  onPress={() => setSelected(null)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.detailCloseText}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -260,4 +320,24 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(18), color: '#7D8A95', marginBottom: vs(8) },
   emptyDesc: { fontFamily: 'Inter-Regular', fontSize: fs(14), color: '#B0B0B0', textAlign: 'center', lineHeight: fs(20) },
+  // ── Notification detail popup ──
+  detailBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(24),
+  },
+  detailCard: {
+    width: '100%', maxWidth: s(360), maxHeight: '75%',
+    backgroundColor: '#fff', borderRadius: s(16), padding: s(20),
+  },
+  detailHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: vs(14) },
+  detailHeaderText: { flex: 1, marginLeft: s(12) },
+  detailTitle: { fontFamily: 'Inter-SemiBold', fontSize: fs(17), color: '#1F2937', lineHeight: fs(23) },
+  detailTime: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: '#9AA5B0', marginTop: vs(2) },
+  detailBodyScroll: { flexGrow: 0 },
+  detailBody: { fontFamily: 'Inter-Regular', fontSize: fs(15), color: '#3F4A54', lineHeight: fs(23) },
+  detailCloseBtn: {
+    marginTop: vs(18), height: vs(48), borderRadius: s(12),
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  detailCloseText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: '#fff' },
 });

@@ -241,7 +241,7 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
             // The user backed out of this screen while the create was still
             // in flight. Cancel the ride we just created — otherwise it lingers
             // as a ghost: it blocks the next booking (409 "already have an
-            // active ride") until the 5-min auto-cancel, and a driver can be
+            // active ride") until the 3-min auto-cancel, and a driver can be
             // paged to a pickup with nobody there.
             dispatch(cancelRideThunk({ id: newRideId, reason: 'Cancelled while searching' }));
             return;

@@ -51,6 +51,11 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
   const [vehicles, setVehicles] = useState<RouteVehicle[] | null>(null);
   const [routeCapacity, setRouteCapacity] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Server explanation for a date/slot that cannot be booked (past date,
+  // closed departure, non-operating day). When set, the empty state renders
+  // THIS instead of the generic "check back closer to departure" copy —
+  // which is actively wrong for a closed date.
+  const [closedMessage, setClosedMessage] = useState<string | null>(null);
   const [seatsNeeded, setSeatsNeeded] = useState(1);
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
 
@@ -58,12 +63,14 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
     let cancelled = false;
     setError(null);
     setVehicles(null);
+    setClosedMessage(null);
     routeService
       .listVehicles(scheduledRoute.id, { date: departureDate, departureIndex })
       .then((res) => {
         if (cancelled) return;
         setVehicles(res.vehicles);
         setRouteCapacity(res.totalSeats || 0);
+        setClosedMessage(res.message ?? null);
       })
       .catch((err: any) => {
         if (cancelled) return;
@@ -236,8 +243,8 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
 
           {vehicles.length === 0 && !error && (
             <Text style={styles.helperText}>
-              No vehicles are available for this departure yet. Try another
-              route or check back closer to departure time.
+              {closedMessage ??
+                'No vehicles are available for this departure yet. Try another route or check back closer to departure time.'}
             </Text>
           )}
 

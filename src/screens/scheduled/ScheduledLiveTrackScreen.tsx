@@ -449,6 +449,20 @@ export const ScheduledLiveTrackScreen: React.FC<Props> = ({ navigation, route })
             <Text style={styles.callBtnText}>Call Driver</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={styles.messageBtn}
+            activeOpacity={0.85}
+            onPress={() =>
+              // Scheduled trips have no Ride doc — the chat thread is keyed
+              // by the ScheduledBooking id (driver app + backend match).
+              navigation.navigate('Chat', {
+                rideId: bookingId,
+                driver: { id: bookedDriverId, name: driverName, phone: driverPhone },
+              })
+            }
+          >
+            <Ionicons name="chatbubble-outline" size={s(20)} color={Colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.emergencyBtn}
             activeOpacity={0.85}
             onPress={() => setFlow('options')}
@@ -809,6 +823,16 @@ const styles = StyleSheet.create({
     gap: s(8),
   },
   callBtnText: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.white },
+  messageBtn: {
+    width: vs(50),
+    height: vs(50),
+    borderRadius: s(12),
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emergencyBtn: {
     flex: 1,
     height: vs(50),

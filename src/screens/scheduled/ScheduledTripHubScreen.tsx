@@ -49,7 +49,26 @@ type Stage =
   | 'boarded'
   | 'dropped'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'expired'
+  | 'missed';
+
+/**
+ * Mirrors the server's default cancellationCutoffMinutes — cancellation
+ * closes this many minutes before departure. The `departing` stage begins
+ * exactly when cancellation closes, which is why the Cancel button lives
+ * only in the `confirmed` stage. Only a fallback: when the status payload
+ * carries `timing.cancellationCutoffMinutes` (the route-resolved value the
+ * backend actually enforces) that wins.
+ */
+const CANCEL_CUTOFF_MIN = 60;
+
+/**
+ * Mirrors the server's default startWindowMinutes — a journey may begin up
+ * to this long after the scheduled time. Past it, with the booking still
+ * reserved and no journey running, the trip is treated as missed.
+ */
+const MISSED_AFTER_MIN = 30;
 
 const STEPS: { key: Stage; label: string }[] = [
   { key: 'confirmed', label: 'Booked' },
@@ -65,22 +84,44 @@ const STEP_INDEX: Record<string, number> = {
 const computeStage = (st: BookingStatus): Stage => {
   if (st.status === 'cancelled') return 'cancelled';
   if (st.status === 'completed') return 'completed';
+  if (st.status === 'expired') return 'expired';
   if (st.earlyDrop?.status === 'approved') return 'dropped';
   if (st.boarded) return 'boarded';
   if (st.journeyActive && st.atBoarding) return 'arrived';
   if (st.journeyActive) return 'arriving';
-  if (st.minutesToDeparture != null && st.minutesToDeparture <= 60) return 'departing';
+  // Departure long past, still reserved, no journey running: the trip was
+  // missed (or never ran) — never sit in "departing" forever.
+  if (
+    st.status === 'reserved' &&
+    st.minutesToDeparture != null &&
+    st.minutesToDeparture < -MISSED_AFTER_MIN
+  ) {
+    return 'missed';
+  }
+  const cancelCutoff = st.timing?.cancellationCutoffMinutes ?? CANCEL_CUTOFF_MIN;
+  if (st.minutesToDeparture != null && st.minutesToDeparture <= cancelCutoff) return 'departing';
   return 'confirmed';
 };
 
+// Countdown phrase for a departure that has NOT passed yet. Callers switch to
+// dedicated copy once minutesToDeparture goes negative (the departing-now
+// banner, then the missed state), so this never renders a perpetual "now".
 const fmtCountdown = (mins: number | null): string => {
   if (mins == null) return '';
-  if (mins <= 0) return 'now';
+  if (mins <= 0) return 'less than a minute';
   if (mins < 60) return `${mins} min`;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m ? `${h} hr ${m} min` : `${h} hr`;
 };
+
+// IST clock label ("hh:mm am/pm") for an epoch — business time is IST.
+const fmtISTClock = (ms: number): string =>
+  new Date(ms).toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 /**
  * The rider's live "My Scheduled Trip" hub. One screen that walks the whole
@@ -130,10 +171,42 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
 
   const stage: Stage = useMemo(() => (status ? computeStage(status) : 'loading'), [status]);
 
+  // Route-resolved cancellation cutoff from the status payload (the number
+  // the backend actually enforces); platform default until it arrives.
+  const cancelCutoffMin =
+    status?.timing?.cancellationCutoffMinutes ?? CANCEL_CUTOFF_MIN;
+
+  // Cancellation deadline (departure minus the cutoff) as an IST clock label.
+  // departureDate/departureTime from the status endpoint are the IST civil
+  // date + 24h "HH:mm", so the instant is anchored with +05:30 exactly like
+  // the backend computes minutesToDeparture.
+  const cancelDeadlineLabel = useMemo(() => {
+    if (!status?.departureDate || !/^\d{4}-\d{2}-\d{2}$/.test(status.departureDate)) return null;
+    const m = /^(\d{1,2}):(\d{2})$/.exec(status.departureTime ?? '');
+    if (!m) return null;
+    const departMs = Date.parse(
+      `${status.departureDate}T${m[1].padStart(2, '0')}:${m[2]}:00+05:30`,
+    );
+    if (Number.isNaN(departMs)) return null;
+    return fmtISTClock(departMs - cancelCutoffMin * 60000);
+  }, [status?.departureDate, status?.departureTime, cancelCutoffMin]);
+
   const call = (phone?: string | null) => {
     if (!phone) return Alert.alert('Number unavailable');
     Linking.openURL(`tel:${phone}`).catch(() => {});
   };
+
+  // Scheduled trips have no Ride doc — the chat thread is keyed by the
+  // ScheduledBooking id (driver app + backend use the same key).
+  const messageDriver = () =>
+    navigation.navigate('Chat', {
+      rideId: bookingId,
+      driver: {
+        id: status?.driver?.id,
+        name: status?.driver?.name ?? 'Driver',
+        phone: status?.driver?.phone,
+      },
+    });
 
   const openTicket = () =>
     navigation.navigate('ScheduledTripSummary', {
@@ -215,8 +288,14 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
           try {
             await routeService.cancelBooking(bookingId);
             navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-          } catch {
-            Alert.alert('Error', 'Failed to cancel. Please try again.');
+          } catch (err: any) {
+            // Surface the server's business message (e.g. the cancellation
+            // window has closed) — never a raw/internal error.
+            const msg =
+              typeof err?.response?.data?.message === 'string'
+                ? err.response.data.message
+                : 'Failed to cancel. Please try again.';
+            Alert.alert('Cancellation Failed', msg);
           }
         },
       },
@@ -249,8 +328,9 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
         </View>
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + vs(28) }]}>
-          {/* Progress stepper */}
-          {stage !== 'cancelled' && (
+          {/* Progress stepper — hidden for terminal/limbo states that do not
+              map onto the boarding journey. */}
+          {stage !== 'cancelled' && stage !== 'expired' && stage !== 'missed' && (
             <View style={styles.stepper}>
               {STEPS.map((step, i) => {
                 const cur = STEP_INDEX[stage] ?? 0;
@@ -288,6 +368,27 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
               subtitle="This scheduled ride was cancelled." />
           )}
 
+          {/* Terminal: the maintenance sweep marked the trip expired and
+              auto-refunded the fare. No live-tracking affordances. */}
+          {stage === 'expired' && (
+            <StageCard icon="time-outline" tint={Colors.textMuted} title="Trip Did Not Run"
+              subtitle="This trip did not run. Your fare has been refunded to your wallet." />
+          )}
+
+          {/* Departure long past, booking still reserved, no journey running.
+              NOT terminal: a late-running driver can still legitimately start
+              all day, and the 15s poll keeps running here so a late start
+              flips this back to the live stages. The copy must not promise a
+              refund the trip may yet invalidate. */}
+          {stage === 'missed' && (
+            <>
+              <StageCard icon="alert-circle" tint="#EA580C" title="Departure Time Passed"
+                subtitle="The departure time has passed. If the trip does not run, your fare will be refunded after the travel date." />
+              <DetailsCard status={status} p={p} seatLabel={seatLabel} />
+              <OutlineBtn label="View Ticket" icon="qr-code-outline" onPress={openTicket} />
+            </>
+          )}
+
           {stage === 'completed' && (
             <>
               <StageCard icon="checkmark-done-circle" tint={Colors.success} title="Trip Completed"
@@ -316,10 +417,15 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
                 } />
               <DetailsCard status={status} p={p} seatLabel={seatLabel} />
               <View style={styles.reminder}>
-                <Text style={styles.reminderText}>💡 We'll remind you before departure. Live tracking opens closer to departure.</Text>
+                <Text style={styles.reminderText}>We'll remind you before departure. Live tracking opens closer to departure.</Text>
               </View>
               <OutlineBtn label="Show Ticket / QR" icon="qr-code-outline" onPress={openTicket} />
               <TextBtn label="Cancel Ride" tint={Colors.error} onPress={cancelBooking} />
+              <Text style={styles.cancelNote}>
+                {cancelDeadlineLabel
+                  ? `Free cancellation until ${cancelDeadlineLabel}`
+                  : `Free cancellation until ${cancelCutoffMin} minutes before departure`}
+              </Text>
             </>
           )}
 
@@ -327,7 +433,11 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
             <>
               <View style={[styles.banner, { backgroundColor: alpha(Colors.primary, 0.1) }]}>
                 <Ionicons name="time" size={s(20)} color={Colors.primary} />
-                <Text style={styles.bannerText}>Your Caar departs in {fmtCountdown(status?.minutesToDeparture ?? null)}!</Text>
+                <Text style={styles.bannerText}>
+                  {status?.minutesToDeparture != null && status.minutesToDeparture <= 0
+                    ? 'Your Caar is departing now.'
+                    : `Your Caar departs in ${fmtCountdown(status?.minutesToDeparture ?? null)}!`}
+                </Text>
               </View>
               <View style={styles.boardingCard}>
                 <Text style={styles.boardingLabel}>Boarding Point</Text>
@@ -348,6 +458,9 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
               </View>
               <PrimaryBtn label="Track Vehicle" icon="navigate" onPress={openTrackVehicle} />
               <OutlineBtn label="Show Ticket / QR Code" icon="qr-code-outline" onPress={openTicket} />
+              <Text style={styles.cancelNote}>
+                Cancellation closed (until {cancelCutoffMin} minutes before departure).
+              </Text>
             </>
           )}
 
@@ -360,6 +473,7 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
               <DriverCard status={status} badge="En Route" />
               <PrimaryBtn label="Track Vehicle" icon="navigate" onPress={openTrackVehicle} />
               <OutlineBtn label="Show My Ticket for Scan" icon="qr-code-outline" onPress={openTicket} />
+              <OutlineBtn label="Message Driver" icon="chatbubble-outline" onPress={messageDriver} />
               {!!status?.driver?.phone && (
                 <TextBtn label="Call Driver" tint={Colors.primary} onPress={() => call(status?.driver?.phone)} />
               )}
@@ -394,6 +508,7 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
                 <BoardedRow label="Driver" value={driverName} />
               </View>
               <PrimaryBtn label="Track Live Ride" icon="navigate" onPress={openLiveRide} />
+              <OutlineBtn label="Message Driver" icon="chatbubble-outline" onPress={messageDriver} />
               {!!status?.driver?.phone && (
                 <OutlineBtn label="Call Driver" icon="call-outline" onPress={() => call(status?.driver?.phone)} />
               )}
@@ -570,6 +685,13 @@ const styles = StyleSheet.create({
   outlineBtnText: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.primary },
   textBtn: { height: vs(46), alignItems: 'center', justifyContent: 'center', marginTop: vs(8) },
   textBtnText: { fontFamily: 'Inter-SemiBold', fontSize: fs(14) },
+  cancelNote: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: vs(6),
+  },
 });
 
 export default ScheduledTripHubScreen;

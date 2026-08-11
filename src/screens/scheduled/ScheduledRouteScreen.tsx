@@ -12,6 +12,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
+import { istDateStr } from '@/utils/date';
 import { routeService, type ScheduledRouteApi } from '@/services/routeService';
 import { geoService } from '@/services/geoService';
 
@@ -50,6 +51,11 @@ export interface ScheduledRoute {
   durationMin: number;
   /** Booked seats on the next-upcoming trip. Available = capacity − this. */
   bookedSeats: number;
+  /** Route-level booking cutoff (admin override of the platform default 10).
+   *  Threaded through the whole booking flow so the payment screen's last
+   *  client-side gate uses the same cutoff the backend enforces — a hardcoded
+   *  10 on a route with a higher cutoff meant pay-then-reject every time. */
+  bookingCutoffMinutes?: number;
 }
 
 // Exported so BoardingDrop / Seat / Summary screens can format the
@@ -63,21 +69,40 @@ export const fmt12h = (hhmm: string): string => {
 };
 
 /**
- * Find the next upcoming departure time today (or earliest tomorrow) from
- * the route's schedule. Falls back to the literal first time slot if all
- * of today's are in the past.
+ * Label for the backend-computed next-upcoming trip. Renders from the
+ * operating-day-aware nextDepartureDate/nextDepartureIndex the API already
+ * returns — the SAME trip the card's seat count refers to. The previous
+ * client-side computation used DEVICE-local hours (wrong on any non-IST
+ * device) and ignored operating days, so the label could name a departure
+ * that doesn't run while the seat count described a different trip.
  */
-const computeNextDeparture = (route: ScheduledRouteApi): string => {
-  const departures = route.schedule?.departures ?? [];
-  if (departures.length === 0) return '—';
-  const now = new Date();
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const sorted = [...departures].sort((a, b) => a.time.localeCompare(b.time));
-  const upcoming = sorted.find(d => {
-    const [h, m] = d.time.split(':').map(Number);
-    return h * 60 + m > nowMin;
-  });
-  return fmt12h((upcoming ?? sorted[0]).time);
+const nextDepartureLabel = (r: ScheduledRouteApi): string => {
+  const departures = r.schedule?.departures ?? [];
+  const date = r.nextDepartureDate;
+  const idx = r.nextDepartureIndex;
+  const slot = typeof idx === 'number' ? departures[idx] : undefined;
+  if (!slot || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return '—';
+
+  const timeLabel = fmt12h(slot.time);
+  const now = Date.now();
+  const todayStr = istDateStr(new Date(now));
+  const tomorrowStr = istDateStr(new Date(now + 86400000));
+  let dayLabel: string;
+  if (date === todayStr) {
+    dayLabel = 'Today';
+  } else if (date === tomorrowStr) {
+    dayLabel = 'Tomorrow';
+  } else {
+    // Format the IST civil date itself, UTC-anchored at noon so the device
+    // timezone cannot shift it to a neighbouring day.
+    dayLabel = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    });
+  }
+  return `${timeLabel} (${dayLabel})`;
 };
 
 // Approximate cruise speed for a shuttle on Indian roads. Used to
@@ -124,7 +149,8 @@ export const routeToUi = (r: ScheduledRouteApi): ScheduledRoute => {
     price: r.schedule?.seatPrice ?? 0,
     durationMin: computeDurationMin(r),
     bookedSeats: r.nextDepartureBookedSeats ?? 0,
-    nextDeparture: computeNextDeparture(r),
+    nextDeparture: nextDepartureLabel(r),
+    bookingCutoffMinutes: r.schedule?.bookingCutoffMinutes,
     approvedDriverCount: r.approvedDriverCount ?? 0,
     returnDepartures: r.schedule?.returnDepartures,
     hasRoundTripDriver: r.hasRoundTripDriver ?? false,

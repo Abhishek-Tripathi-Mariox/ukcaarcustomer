@@ -22,6 +22,16 @@ export interface RouteSchedule {
   seatPrice?: number;
   vehicleType?: string;
   totalSeats?: number;
+  /** Admin timing knobs (route-level overrides of the platform defaults).
+   *  All optional — when absent the client falls back to the same defaults
+   *  the backend uses (cutoff 10, advance 14, start window 30, rest 0,
+   *  cancellation 60). The backend is always the enforcement authority;
+   *  these only keep the client UI honest. */
+  bookingCutoffMinutes?: number;
+  maxAdvanceBookingDays?: number;
+  startWindowMinutes?: number;
+  minRestMinutes?: number;
+  cancellationCutoffMinutes?: number;
 }
 
 /** One driver's vehicle serving a route+departure, with its own seat
@@ -127,14 +137,22 @@ export const routeService = {
   listVehicles: async (
     routeId: string,
     opts: { date: string; departureIndex: number },
-  ): Promise<{ totalSeats: number; vehicles: RouteVehicle[] }> => {
+  ): Promise<{ totalSeats: number; vehicles: RouteVehicle[]; message?: string }> => {
     const { data } = await api.get<{
       success: boolean;
+      /** Human explanation when this date/slot cannot be booked (past date,
+       *  beyond the advance window, non-operating day, inside the booking
+       *  cutoff). Availability arrives empty in that case — the UI must show
+       *  this instead of a generic "no vehicles yet" empty state. */
+      message?: string;
       data: { totalSeats: number; vehicles: RouteVehicle[] };
     }>(`/routes/${routeId}/vehicles`, {
       params: { date: opts.date, departureIndex: opts.departureIndex },
     });
-    return data?.data ?? { totalSeats: 0, vehicles: [] };
+    return {
+      ...(data?.data ?? { totalSeats: 0, vehicles: [] }),
+      ...(data?.message ? { message: data.message } : {}),
+    };
   },
 
   /**
@@ -146,9 +164,13 @@ export const routeService = {
   getSeats: async (
     routeId: string,
     opts: { date: string; departureIndex: number; driverId?: string },
-  ): Promise<{ totalSeats: number; booked: number[] }> => {
+  ): Promise<{ totalSeats: number; booked: number[]; message?: string }> => {
     const { data } = await api.get<{
       success: boolean;
+      /** Set when this date/slot cannot be booked (past / closed /
+       *  non-operating day). `booked` is empty then — WITHOUT surfacing this
+       *  message a closed slot would render as an all-free seat map. */
+      message?: string;
       data: { totalSeats: number; booked: number[] };
     }>(`/routes/${routeId}/seats`, {
       params: {
@@ -157,7 +179,10 @@ export const routeService = {
         ...(opts.driverId ? { driverId: opts.driverId } : {}),
       },
     });
-    return data.data;
+    return {
+      ...data.data,
+      ...(data?.message ? { message: data.message } : {}),
+    };
   },
 
   /**
@@ -242,7 +267,9 @@ export const routeService = {
 
 export interface BookingStatus {
   bookingId: string;
-  status: 'reserved' | 'completed' | 'cancelled';
+  /** 'expired' is set by the backend maintenance sweep for trips whose date
+   *  passed without running; the fare is auto-refunded to the wallet. */
+  status: 'reserved' | 'completed' | 'cancelled' | 'expired';
   routeId: string;
   routeName: string | null;
   boardingName: string | null;
@@ -251,6 +278,13 @@ export interface BookingStatus {
   departureTime: string;
   minutesToDeparture: number | null;
   seats: number[];
+  /** Resolved timing knobs for this booking's route (route override or
+   *  platform default), so the client shows the same cutoffs the backend
+   *  enforces. Optional — older backends omit it; fall back to 10/60. */
+  timing?: {
+    bookingCutoffMinutes?: number;
+    cancellationCutoffMinutes?: number;
+  } | null;
   journeyStatus: string | null;
   journeyActive: boolean;
   atBoarding: boolean;

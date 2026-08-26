@@ -111,7 +111,7 @@ export const authService = {
   sendOtp: async (payload: SendOtpPayload) => {
     const fullPhone = `${payload.countryCode}${payload.phone.replace(/\s/g, '')}`;
     try {
-      phoneConfirmation = await auth().signInWithPhoneNumber(fullPhone, true);
+      phoneConfirmation = await auth().signInWithPhoneNumber(fullPhone);
       return { success: true };
     } catch (e: any) {
       const err: any = new Error(phoneAuthMessage(e?.code));

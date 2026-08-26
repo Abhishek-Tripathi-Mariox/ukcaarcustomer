@@ -84,3 +84,8 @@ expo-env.d.ts
 
 # Logs
 *.log
+
+# Release signing credentials — never commit
+android/keystore.properties
+*.keystore
+!android/app/debug.keystore

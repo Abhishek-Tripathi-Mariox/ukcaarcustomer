@@ -46,6 +46,16 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Credentials live in android/gradle.properties, which must never
+            // be committed. If they are missing the build fails loudly rather
+            // than silently falling back to the debug key — a debug-signed
+            // release is rejected by Play and breaks Firebase phone auth.
+            storeFile file(project.property('UKCAAR_RELEASE_STORE_FILE'))
+            storePassword project.property('UKCAAR_RELEASE_STORE_PASSWORD')
+            keyAlias project.property('UKCAAR_RELEASE_KEY_ALIAS')
+            keyPassword project.property('UKCAAR_RELEASE_KEY_PASSWORD')
+        }
     }
     buildTypes {
         debug {
@@ -58,9 +68,7 @@ android {
             resValue "integer", "react_native_dev_server_port", "8082"
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

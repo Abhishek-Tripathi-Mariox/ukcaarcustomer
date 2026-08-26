@@ -1,5 +1,6 @@
 import api, { setTokens, clearTokens } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 export interface SendOtpPayload {
   phone: string;
@@ -66,14 +67,89 @@ export interface UpdateProfilePayload {
 // one OTP endpoint and one User collection).
 const APP_TYPE = 'customer' as const;
 
+/**
+ * Firebase phone sign-in state.
+ *
+ * signInWithPhoneNumber hands back a confirmation handle that must survive
+ * between the Login screen (which requests the code) and the OTP screen
+ * (which submits it). It is deliberately module-level rather than in Redux:
+ * the handle is a live object with methods, so it is not serialisable and
+ * would trip Redux's serialisability check.
+ *
+ * Killing the app between the two screens loses it — verifyOtp detects the
+ * null and asks the user to request a fresh code.
+ */
+let phoneConfirmation: FirebaseAuthTypes.ConfirmationResult | null = null;
+
+/** Maps Firebase's error codes to something a rider can act on. */
+const phoneAuthMessage = (code?: string): string => {
+  switch (code) {
+    case 'auth/invalid-phone-number':
+      return 'That phone number does not look right. Please check and try again.';
+    case 'auth/invalid-verification-code':
+      return 'That code is incorrect. Please check and try again.';
+    case 'auth/code-expired':
+      return 'That code has expired. Please request a new one.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a few minutes before trying again.';
+    case 'auth/quota-exceeded':
+    case 'auth/missing-client-identifier':
+      return 'Sign-in is temporarily unavailable. Please try again shortly.';
+    case 'auth/network-request-failed':
+      return 'No internet connection. Please check your network and try again.';
+    default:
+      return 'Could not sign you in. Please try again.';
+  }
+};
+
 export const authService = {
+  /**
+   * Asks Firebase to text a verification code. Google sends the SMS from
+   * their own registered sender, which is why UKCAAR needs no TRAI DLT
+   * registration for login. Nothing hits our backend on this step.
+   */
   sendOtp: async (payload: SendOtpPayload) => {
-    const { data } = await api.post('/auth/send-otp', { ...payload, appType: APP_TYPE });
-    return data;
+    const fullPhone = `${payload.countryCode}${payload.phone.replace(/\s/g, '')}`;
+    try {
+      phoneConfirmation = await auth().signInWithPhoneNumber(fullPhone, true);
+      return { success: true };
+    } catch (e: any) {
+      const err: any = new Error(phoneAuthMessage(e?.code));
+      err.response = { status: 400, data: { message: err.message } };
+      throw err;
+    }
   },
 
+  /**
+   * Confirms the code with Firebase, then trades the resulting ID token for
+   * our own session at /auth/firebase-login. The code itself never reaches
+   * our server.
+   */
   verifyOtp: async (payload: VerifyOtpPayload): Promise<AuthResponse> => {
-    const { data } = await api.post<AuthResponse>('/auth/verify-otp', { ...payload, appType: APP_TYPE });
+    if (!phoneConfirmation) {
+      const err: any = new Error('Your session expired. Please request a new code.');
+      err.response = { status: 400, data: { message: err.message } };
+      throw err;
+    }
+
+    let idToken: string;
+    try {
+      const credential = await phoneConfirmation.confirm(payload.otp);
+      if (!credential?.user) throw new Error('no user');
+      idToken = await credential.user.getIdToken();
+    } catch (e: any) {
+      const err: any = new Error(phoneAuthMessage(e?.code));
+      err.response = { status: 400, data: { message: err.message } };
+      throw err;
+    }
+
+    // One-shot: a confirmed handle cannot be reused for another attempt.
+    phoneConfirmation = null;
+
+    const { data } = await api.post<AuthResponse>('/auth/firebase-login', {
+      idToken,
+      appType: APP_TYPE,
+    });
     // Defence in depth: even if an older backend (without the server-side role
     // guard) hands us a driver account, refuse it and drop the tokens the
     // request just persisted, so no driver session survives in the customer app.

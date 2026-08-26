@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, { AndroidImportance, AndroidStyle } from '@notifee/react-native';
 import api from './api';
 
 const FCM_TOKEN_KEY = 'fcmToken';
@@ -56,6 +56,11 @@ export async function displayRemoteMessage(
       channelId: DEFAULT_CHANNEL_ID,
       // smallIcon defaults to the app's launcher icon when omitted.
       pressAction: { id: 'default' },
+      // Without BIGTEXT Android clamps the banner to a single line with no
+      // way to expand it, so anything longer than ~40 characters was simply
+      // unreadable from the notification shade. The in-app list has always
+      // had the full text on tap; this makes the banner itself expandable.
+      style: { type: AndroidStyle.BIGTEXT, text: body },
     },
   });
 }

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  TextInput,
 } from 'react-native';
 import MapView, {
   Marker,
@@ -20,11 +21,12 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Colors, Shadow } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { estimateFare, setSelectedVehicle } from '@/store/slices/rideSlice';
+import { estimateFare, setSelectedVehicle, setPendingPromoCode } from '@/store/slices/rideSlice';
 import { FlashIcon, CabIcon } from '@/components/icons/HomeIcons';
 import { TaxiAIcon, TaxiBIcon } from '@/components/icons/TaxiIcons';
 import { ClockSmallIcon, UserCircleSmallIcon } from '@/components/icons/RideIcons';
 import { rideService, NearbyVehicleType } from '@/services/rideService';
+import { paymentService } from '@/services/paymentService';
 import { driverService, NearbyDriver } from '@/services/driverService';
 import { geoService, GeoDirections } from '@/services/geoService';
 import { fs, s, vs } from '@/theme/responsive';
@@ -45,9 +47,20 @@ interface SelectRideScreenProps {
   };
 }
 
-function renderVehicleArt(code: string, size: number): React.ReactElement {
-  const c = code.toLowerCase();
-  if (c.includes('bike') || c.includes('2-wheeler') || c.includes('motorcycle')) {
+// Admin-defined types carry no "wheels" field, so the art is picked from the
+// code AND display name. Admins name types freely ("Two Wheeler", "Auto
+// Rickshaw", "Scooty"), which the old code-only bike/auto match missed — every
+// type then fell through to the car icon.
+const TWO_WHEELER = /\b(bike|moto|motorcycle|scoot|two[\s-]?wheel|2[\s-]?wheel|2w|cycle)/i;
+const THREE_WHEELER = /\b(auto|rick|tuk|three[\s-]?wheel|3[\s-]?wheel|3w|tempo)/i;
+const PREMIUM = /\b(premium|luxury|prime|suv|xl|muv|black|exec)/i;
+
+function renderVehicleArt(
+  type: { code: string; name?: string },
+  size: number,
+): React.ReactElement {
+  const c = `${type.code} ${type.name ?? ''}`;
+  if (TWO_WHEELER.test(c)) {
     return (
       <Image
         source={motorbikePng}
@@ -56,7 +69,7 @@ function renderVehicleArt(code: string, size: number): React.ReactElement {
       />
     );
   }
-  if (c.includes('auto') || c.includes('3-wheeler') || c.includes('rickshaw')) {
+  if (THREE_WHEELER.test(c)) {
     return (
       <Image
         source={autoPng}
@@ -65,7 +78,7 @@ function renderVehicleArt(code: string, size: number): React.ReactElement {
       />
     );
   }
-  if (c.includes('premium') || c.includes('luxury')) {
+  if (PREMIUM.test(c)) {
     return <TaxiAIcon size={size} />;
   }
   return <TaxiBIcon size={size} />;
@@ -75,8 +88,8 @@ function renderVehicleArt(code: string, size: number): React.ReactElement {
 // hasn't been given an explicit `seats` capacity for the vehicle type yet.
 function seatsForCode(code: string): number {
   const c = code.toLowerCase();
-  if (c.includes('bike') || c.includes('2-wheeler')) return 1;
-  if (c.includes('auto') || c.includes('3-wheeler')) return 3;
+  if (TWO_WHEELER.test(c)) return 1;
+  if (THREE_WHEELER.test(c)) return 3;
   if (c.includes('hatch')) return 4;
   if (c.includes('sedan')) return 4;
   if (c.includes('muv') || c.includes('suv')) return 6;
@@ -86,10 +99,10 @@ function seatsForCode(code: string): number {
 
 // Prefer the admin-configured capacity from the backend; fall back to the
 // code heuristic so existing vehicle types (no `seats` set) still show a value.
-function seatsForType(type: { code: string; seats?: number }): number {
+function seatsForType(type: { code: string; name?: string; seats?: number }): number {
   return typeof type.seats === 'number' && type.seats > 0
     ? type.seats
-    : seatsForCode(type.code);
+    : seatsForCode(`${type.code} ${type.name ?? ''}`);
 }
 
 export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
@@ -127,9 +140,18 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
   // routing request is in flight. The directions effect below re-dispatches
   // with the routed distance/duration once they land so the cards reflect
   // the same time the user sees on the map chip.
+  // Outside-service-area refusal from the backend geofence (only enforced
+  // once admins draw a "Service area" zone). Shown in place of the ride list
+  // and blocks Book, so the rider finds out here rather than after booking.
+  const [areaError, setAreaError] = useState<string | null>(null);
   useEffect(() => {
     if (pickupLoc && dropoffLoc) {
-      dispatch(estimateFare({ pickup: pickupLoc, dropoff: dropoffLoc }));
+      setAreaError(null);
+      dispatch(estimateFare({ pickup: pickupLoc, dropoff: dropoffLoc }))
+        .unwrap()
+        .catch((msg: unknown) => {
+          if (typeof msg === 'string' && /service area/i.test(msg)) setAreaError(msg);
+        });
     }
   }, [pickupLoc, dropoffLoc, dispatch]);
 
@@ -281,13 +303,76 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
     ? Math.round(directions.durationSeconds / 60)
     : selectedEstimate?.estimatedDuration ?? 0;
 
+  // ── Promo code ──
+  // Validated up front against /payments/promo/validate so the rider sees the
+  // discount before booking; the backend re-checks and applies it on
+  // createRide (FindingDriver forwards the code). A code tapped on the Home
+  // "Offers" rail arrives via the ride slice and is applied automatically.
+  const pendingPromo = useAppSelector((s) => s.ride.pendingPromoCode);
+  const [promoInput, setPromoInput] = useState(pendingPromo ?? '');
+  const [promoApplied, setPromoApplied] = useState<{
+    code: string;
+    type: 'percentage' | 'fixed';
+    value: number;
+    maxDiscount?: number;
+    minFare?: number;
+  } | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+
+  const applyPromo = async (codeArg?: string) => {
+    const code = (codeArg ?? promoInput).trim().toUpperCase();
+    if (!code || promoBusy) return;
+    setPromoBusy(true);
+    setPromoError(null);
+    try {
+      const res = await paymentService.validatePromo(code);
+      setPromoApplied(res.data);
+      setPromoInput(code);
+    } catch (err: any) {
+      setPromoApplied(null);
+      setPromoError(err?.response?.data?.message ?? 'Invalid or expired promo code');
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+  const clearPromo = () => {
+    setPromoApplied(null);
+    setPromoError(null);
+    setPromoInput('');
+  };
+  useEffect(() => {
+    if (pendingPromo) applyPromo(pendingPromo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPromo]);
+
+  // Preview of what the backend will take off (it caps at maxDiscount and at
+  // 50% of the fare, and ignores the code under minFare).
+  const promoDiscount = (() => {
+    if (!promoApplied || !selectedEstimate) return 0;
+    const fare = selectedEstimate.estimatedFare;
+    if (promoApplied.minFare && fare < promoApplied.minFare) return 0;
+    const cap =
+      promoApplied.maxDiscount && promoApplied.maxDiscount > 0
+        ? promoApplied.maxDiscount
+        : Infinity;
+    const raw =
+      promoApplied.type === 'percentage'
+        ? (fare * promoApplied.value) / 100
+        : promoApplied.value;
+    return Math.max(0, Math.min(raw, cap, fare * 0.5));
+  })();
+
   const handleConfirm = () => {
-    if (!selectedType) return;
+    if (!selectedType || areaError) return;
     dispatch(setSelectedVehicle(selectedType.code));
+    // The code has been consumed by this booking — don't re-apply it next time.
+    dispatch(setPendingPromoCode(null));
     const est = selectedEstimate;
     navigation.navigate('FindingDriver', {
       pickup,
       dropoff,
+      promoCode: promoApplied?.code,
       rideType: {
         id: selectedType.code,
         name: selectedType.name,
@@ -396,7 +481,14 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
         <View style={styles.sheetHandle} />
         <Text style={styles.sheetTitle}>Available rides</Text>
 
-        {(typesLoading || (loading && estimates.length === 0)) ? (
+        {areaError ? (
+          <View style={{ paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center' }}>
+            <Ionicons name="alert-circle-outline" size={30} color="#C62828" />
+            <Text style={[styles.loadingText, { textAlign: 'center', color: '#C62828' }]}>
+              {areaError}
+            </Text>
+          </View>
+        ) : (typesLoading || (loading && estimates.length === 0)) ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
             <ActivityIndicator size="large" color={Colors.primary} />
             <Text style={styles.loadingText}>
@@ -435,7 +527,7 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
                   activeOpacity={0.7}
                 >
                   <View style={styles.rideImageBox}>
-                    {renderVehicleArt(type.code, 64)}
+                    {renderVehicleArt(type, 64)}
                   </View>
 
                   <View style={styles.rideInfo}>
@@ -468,6 +560,52 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
         )}
 
         <View style={[styles.bookSection, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={styles.promoRow}>
+            <TextInput
+              style={styles.promoInput}
+              value={promoInput}
+              onChangeText={(t) => {
+                setPromoInput(t);
+                if (promoApplied) setPromoApplied(null);
+                if (promoError) setPromoError(null);
+              }}
+              placeholder="Have a promo code?"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!promoBusy}
+              returnKeyType="done"
+              onSubmitEditing={() => applyPromo()}
+            />
+            <TouchableOpacity
+              style={[
+                styles.promoApply,
+                (!promoInput.trim() || promoBusy) && styles.promoApplyDisabled,
+              ]}
+              onPress={() => (promoApplied ? clearPromo() : applyPromo())}
+              disabled={!promoInput.trim() || promoBusy}
+              activeOpacity={0.8}
+            >
+              {promoBusy ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Text style={styles.promoApplyText}>{promoApplied ? 'Remove' : 'Apply'}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          {!!promoError && <Text style={styles.promoError}>{promoError}</Text>}
+          {promoApplied && (
+            <View style={styles.rewardBanner}>
+              <Text style={styles.rewardBannerText}>
+                🏷️ {promoApplied.code} applied
+                {promoDiscount > 0
+                  ? ` — ₹${promoDiscount.toFixed(0)} off`
+                  : promoApplied.minFare && selectedEstimate
+                  ? ` — needs a fare of ₹${promoApplied.minFare}+`
+                  : ''}
+              </Text>
+            </View>
+          )}
           {!!selectedEstimate?.loyaltyDiscount && selectedEstimate.loyaltyDiscount > 0 && (
             <View style={styles.rewardBanner}>
               <Text style={styles.rewardBannerText}>
@@ -476,13 +614,16 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
             </View>
           )}
           <TouchableOpacity
-            style={[styles.bookButton, !selectedRide && styles.bookButtonDisabled]}
+            style={[
+              styles.bookButton,
+              (!selectedRide || !!areaError) && styles.bookButtonDisabled,
+            ]}
             onPress={handleConfirm}
-            disabled={!selectedRide}
+            disabled={!selectedRide || !!areaError}
             activeOpacity={0.85}
           >
             <FlashIcon size={18} color={Colors.white} />
-            <Text style={styles.bookText}>Book Cab</Text>
+            <Text style={styles.bookText}>Book {selectedType?.name ?? 'Cab'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -687,6 +828,47 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     fontSize: fs(13),
     color: '#2E7D32',
+  },
+  promoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: vs(10),
+  },
+  promoInput: {
+    flex: 1,
+    height: vs(42),
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: s(10),
+    paddingHorizontal: s(12),
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(13),
+    color: Colors.textPrimary,
+    backgroundColor: Colors.white,
+  },
+  promoApply: {
+    marginLeft: s(8),
+    height: vs(42),
+    minWidth: s(72),
+    paddingHorizontal: s(14),
+    borderRadius: s(10),
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoApplyDisabled: {
+    opacity: 0.5,
+  },
+  promoApplyText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(13),
+    color: Colors.white,
+  },
+  promoError: {
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(12),
+    color: '#C62828',
+    marginBottom: vs(8),
   },
   bookButton: {
     flexDirection: 'row',

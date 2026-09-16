@@ -198,7 +198,7 @@ export const OTPVerificationScreen: React.FC<OTPScreenProps> = ({
       inputRefs.current[0]?.focus();
 
       try {
-        await dispatch(sendOtp({ phone, countryCode })).unwrap();
+        await dispatch(sendOtp({ phone, countryCode, forceResend: true })).unwrap();
       } catch (e: any) {
         const msg = typeof e === 'string' ? e : e?.message;
         setError(msg || 'Failed to resend OTP. Please try again.');
@@ -277,12 +277,12 @@ export const OTPVerificationScreen: React.FC<OTPScreenProps> = ({
                 <TouchableOpacity onPress={handleResend}>
                   <Text style={styles.resendLabel}>
                     Didn't receive code?{' '}
-                    <Text style={styles.resendActive}>Resend again</Text>
+                    <Text style={styles.resendActive}>Resend OTP</Text>
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.timerText}>
-                  Didn't receive code?{' '}
+                  Didn't receive code? Resend in{' '}
                   <Text style={styles.timerCount}>
                     {`0:${timer.toString().padStart(2, '0')}`}
                   </Text>

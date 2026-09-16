@@ -8,6 +8,7 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -87,6 +88,59 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
   const user = useAppSelector((s) => s.auth.user);
   const walletBalance = useAppSelector((s) => s.app.walletBalance);
 
+  // ── Promo code ──
+  // Validated up front (same endpoint as instant rides) so the rider sees
+  // the discount before paying. The Razorpay order is created for the
+  // discounted total; the backend re-validates the code at booking, applies
+  // the same maths to `totalAmount` (the gross fare) and, for wallet
+  // payments, debits the discounted amount server-side.
+  const [promoInput, setPromoInput] = useState('');
+  const [promoApplied, setPromoApplied] = useState<{
+    code: string;
+    type: 'percentage' | 'fixed';
+    value: number;
+    maxDiscount?: number;
+    minFare?: number;
+  } | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const applyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code || promoBusy) return;
+    setPromoBusy(true);
+    setPromoError(null);
+    try {
+      const res = await paymentService.validatePromo(code);
+      setPromoApplied(res.data);
+      setPromoInput(code);
+    } catch (err: any) {
+      setPromoApplied(null);
+      setPromoError(err?.response?.data?.message ?? 'Invalid or expired promo code');
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+  const clearPromo = () => {
+    setPromoApplied(null);
+    setPromoError(null);
+    setPromoInput('');
+  };
+  // Mirrors the backend maths exactly (bookRouteSeats): capped at maxDiscount
+  // and at 50% of the fare, nothing under minFare, rounded to paise.
+  const promoDiscount = (() => {
+    if (!promoApplied) return 0;
+    if (promoApplied.minFare && total < promoApplied.minFare) return 0;
+    const cap =
+      promoApplied.maxDiscount && promoApplied.maxDiscount > 0
+        ? promoApplied.maxDiscount
+        : Infinity;
+    const raw =
+      promoApplied.type === 'percentage' ? (total * promoApplied.value) / 100 : promoApplied.value;
+    return Math.round(Math.max(0, Math.min(raw, cap, total * 0.5)) * 100) / 100;
+  })();
+  const payable = Math.max(0, Math.round((total - promoDiscount) * 100) / 100);
+  const promoCodeToSend = promoDiscount > 0 && promoApplied ? promoApplied.code : undefined;
+
   // The route's real cutoff (admin override) when it made it through the nav
   // params; the platform default otherwise. The server recheck below covers
   // the cases where even this is stale.
@@ -158,7 +212,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
       }
       // ── 1. Pay via UKCAAR Wallet Balance ──
       if (paymentMode === 'wallet') {
-        if (walletBalance < total) {
+        if (walletBalance < payable) {
           Alert.alert(
             'Insufficient Wallet Balance',
             `Your wallet balance is ₹${walletBalance}. Please select Razorpay Online Payment to proceed.`,
@@ -175,6 +229,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
             driverId,
             seats,
             totalAmount: total,
+            promoCode: promoCodeToSend,
             passengers,
             boardingStopSequence: boarding.sequence,
             droppingStopSequence: dropping.sequence,
@@ -190,7 +245,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
             setGlobalWalletBalance(
               typeof booked?.walletBalance === 'number'
                 ? booked.walletBalance
-                : Math.max(0, walletBalance - total),
+                : Math.max(0, walletBalance - payable),
             ),
           );
 
@@ -200,7 +255,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
             dropping,
             seats,
             passengers,
-            total,
+            total: payable,
             departureDate,
             departureIndex,
             driverId,
@@ -232,7 +287,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
 
       // ── 2. Pay via Razorpay Gateway (UPI, Cards, Google Pay, PhonePe, NetBanking) ──
       const orderRes = await paymentService.createOrder({
-        amount: total,
+        amount: payable,
         type: 'ride_payment',
       });
 
@@ -248,7 +303,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
         image: 'https://ukcar.s3.ap-south-1.amazonaws.com/logo.png',
         currency,
         key: keyId,
-        amount: Math.round(total * 100).toString(),
+        amount: Math.round(payable * 100).toString(),
         name: 'UKCAAR',
         order_id: orderId,
         prefill: {
@@ -286,6 +341,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
           driverId,
           seats,
           totalAmount: total,
+          promoCode: promoCodeToSend,
           passengers,
           boardingStopSequence: boarding.sequence,
           droppingStopSequence: dropping.sequence,
@@ -298,7 +354,7 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
           dropping,
           seats,
           passengers,
-          total,
+          total: payable,
           departureDate,
           departureIndex,
           driverId,
@@ -473,6 +529,49 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
           </View>
         </TouchableOpacity>
 
+        {/* Promo code */}
+        <View style={styles.promoBox}>
+          <Text style={styles.fareTitle}>Promo Code</Text>
+          <View style={styles.promoRow}>
+            <TextInput
+              style={styles.promoInput}
+              value={promoInput}
+              onChangeText={(t) => {
+                setPromoInput(t);
+                if (promoApplied) setPromoApplied(null);
+                if (promoError) setPromoError(null);
+              }}
+              placeholder="Have a promo code?"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!promoBusy && !paying}
+              returnKeyType="done"
+              onSubmitEditing={applyPromo}
+            />
+            <TouchableOpacity
+              style={[styles.promoApply, (!promoInput.trim() || promoBusy) && { opacity: 0.5 }]}
+              onPress={promoApplied ? clearPromo : applyPromo}
+              disabled={!promoInput.trim() || promoBusy}
+              activeOpacity={0.8}
+            >
+              {promoBusy ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Text style={styles.promoApplyText}>{promoApplied ? 'Remove' : 'Apply'}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          {!!promoError && <Text style={styles.promoError}>{promoError}</Text>}
+          {promoApplied && (
+            <Text style={styles.promoOk}>
+              {promoDiscount > 0
+                ? `${promoApplied.code} applied — \u20B9${promoDiscount} off`
+                : `${promoApplied.code} needs a fare of \u20B9${promoApplied.minFare ?? 0} or more`}
+            </Text>
+          )}
+        </View>
+
         {/* Fare Summary Box */}
         <View style={styles.fareBox}>
           <Text style={styles.fareTitle}>Payment Breakdown</Text>
@@ -484,10 +583,18 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
             <Text style={styles.fareText}>Taxes & Fees</Text>
             <Text style={[styles.fareAmount, { color: '#10B981' }]}>Included</Text>
           </View>
+          {promoDiscount > 0 && promoApplied && (
+            <View style={styles.fareRow}>
+              <Text style={styles.fareText}>Promo ({promoApplied.code})</Text>
+              <Text style={[styles.fareAmount, { color: '#10B981' }]}>
+                −{'\u20B9'}{promoDiscount}
+              </Text>
+            </View>
+          )}
           <View style={styles.divider} />
           <View style={styles.fareRow}>
             <Text style={styles.totalText}>Total Payable</Text>
-            <Text style={styles.totalAmount}>{'\u20B9'}{total}</Text>
+            <Text style={styles.totalAmount}>{'\u20B9'}{payable}</Text>
           </View>
         </View>
       </ScrollView>
@@ -506,8 +613,8 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
             <View style={styles.ctaRow}>
               <Text style={styles.ctaText}>
                 {paymentMode === 'razorpay'
-                  ? `Pay \u20B9${total} via Razorpay`
-                  : `Pay \u20B9${total} from Wallet`}
+                  ? `Pay \u20B9${payable} via Razorpay`
+                  : `Pay \u20B9${payable} from Wallet`}
               </Text>
               <Ionicons name="arrow-forward" size={s(18)} color={Colors.white} />
             </View>
@@ -692,6 +799,40 @@ const styles = StyleSheet.create({
   },
   totalText: { fontFamily: 'Inter-Bold', fontSize: fs(15), color: Colors.textPrimary },
   totalAmount: { fontFamily: 'Inter-Bold', fontSize: fs(16), color: Colors.primary },
+  promoBox: {
+    backgroundColor: Colors.white,
+    borderRadius: s(14),
+    padding: s(16),
+    marginTop: vs(8),
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  promoRow: { flexDirection: 'row', alignItems: 'center' },
+  promoInput: {
+    flex: 1,
+    height: vs(42),
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: s(10),
+    paddingHorizontal: s(12),
+    fontFamily: 'Inter-Regular',
+    fontSize: fs(13),
+    color: Colors.textPrimary,
+    backgroundColor: Colors.white,
+  },
+  promoApply: {
+    marginLeft: s(8),
+    height: vs(42),
+    minWidth: s(72),
+    paddingHorizontal: s(14),
+    borderRadius: s(10),
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoApplyText: { fontFamily: 'Inter-SemiBold', fontSize: fs(13), color: Colors.white },
+  promoError: { fontFamily: 'Inter-Regular', fontSize: fs(12), color: '#C62828', marginTop: vs(8) },
+  promoOk: { fontFamily: 'Inter-SemiBold', fontSize: fs(12), color: '#10B981', marginTop: vs(8) },
 
   footer: {
     position: 'absolute',

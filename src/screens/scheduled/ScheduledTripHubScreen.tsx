@@ -19,6 +19,17 @@ import { fs, s, vs } from '@/theme/responsive';
 import { routeService, type BookingStatus } from '@/services/routeService';
 import { setSocketListeners } from '@/services/socketService';
 
+
+// Dial with visible failure: openURL rejects on some diallers (stray
+// punctuation, no telephony) and the silent .catch made the tap look dead —
+// same bug class as the driver app's call buttons.
+const dialSafe = (raw: string) => {
+  const phone = raw.replace(/[\s\-()]/g, '');
+  Linking.openURL(`tel:${phone}`).catch(() =>
+    Alert.alert('Could not start the call', `Dial ${phone} manually.`),
+  );
+};
+
 interface Props {
   navigation: any;
   route: {
@@ -193,7 +204,7 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
 
   const call = (phone?: string | null) => {
     if (!phone) return Alert.alert('Number unavailable');
-    Linking.openURL(`tel:${phone}`).catch(() => {});
+    dialSafe(phone);
   };
 
   // Scheduled trips have no Ride doc — the chat thread is keyed by the

@@ -27,6 +27,7 @@ import { fs, s, vs } from '@/theme/responsive';
 import { KeyboardAwareScrollView } from '@/components/common';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateProfile, uploadAvatar } from '@/store/slices/authSlice';
+import { authService } from '@/services/authService';
 
 const { width } = Dimensions.get('window');
 
@@ -44,6 +45,10 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
   const { loading } = useAppSelector((state) => state.auth);
   
   const [fullName, setFullName] = useState('');
+  // Optional referral code, applied right after the profile is saved. Riders
+  // used to have to find "Have a referral code?" under Refer & Earn later —
+  // most never did, so referrals went unrewarded.
+  const [referralCode, setReferralCode] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [selectedPreference, setSelectedPreference] = useState<RidePreference>('Comfort');
   const [showWelcome, setShowWelcome] = useState(false);
@@ -161,6 +166,34 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
       // choice isn't silently discarded (and can drive default ride-type later).
       await AsyncStorage.setItem('pref.ridePreference', selectedPreference);
 
+      // Referral code (optional). The profile is already saved at this point,
+      // so a bad code must not block onboarding: offer to fix it or skip.
+      const code = referralCode.trim().toUpperCase();
+      if (code) {
+        try {
+          const r = await authService.applyReferral(code);
+          if (r?.success === false) throw new Error(r?.message || 'Invalid referral code');
+        } catch (refErr: any) {
+          const msg =
+            refErr?.response?.data?.message || refErr?.message || 'Invalid referral code';
+          setSaving(false);
+          await new Promise<void>((resolve) =>
+            Alert.alert('Referral code not applied', `${msg}. You can also add it later from Refer & Earn.`, [
+              { text: 'Fix code', style: 'cancel', onPress: () => resolve() },
+              {
+                text: 'Skip',
+                onPress: () => {
+                  setReferralCode('');
+                  setShowWelcome(true);
+                  resolve();
+                },
+              },
+            ]),
+          );
+          return;
+        }
+      }
+
       setShowWelcome(true);
     } catch (err: any) {
       console.error('Profile save error:', JSON.stringify(err, null, 2));
@@ -220,6 +253,23 @@ export const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({
             onChangeText={setFullName}
             selectionColor={Colors.primary}
             autoCapitalize="words"
+          />
+        </View>
+
+        {/* Referral code (optional) */}
+        <Text style={styles.inputLabel}>
+          Referral Code <Text style={styles.optionalHint}>(optional)</Text>
+        </Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Enter a friend's referral code"
+            placeholderTextColor={Colors.termsMuted}
+            value={referralCode}
+            onChangeText={setReferralCode}
+            selectionColor={Colors.primary}
+            autoCapitalize="characters"
+            autoCorrect={false}
           />
         </View>
 
@@ -373,6 +423,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     color: Colors.textSecondary,
     marginBottom: Spacing.sm,
+  },
+  optionalHint: {
+    fontFamily: 'Inter-Regular',
+    color: Colors.textMuted,
   },
   inputContainer: {
     marginBottom: Spacing.xl,

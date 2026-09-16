@@ -402,9 +402,11 @@ export const ReferEarnScreen: React.FC<ReferEarnScreenProps> = ({ navigation }) 
           <Text style={styles.whatsappText}>Refer Via Whatsapp</Text>
         </TouchableOpacity>
 
-        {/* Have a referral code? */}
-        <TouchableOpacity onPress={openCodeModal} activeOpacity={0.7}>
-          <Text style={styles.haveCode}>Have a referral code?</Text>
+        {/* Have a referral code? — was an underlined text link below the fold
+            that testers never found; now an outlined button under the share CTA. */}
+        <TouchableOpacity onPress={openCodeModal} activeOpacity={0.7} style={styles.haveCodeBtn}>
+          <Ionicons name="ticket-outline" size={18} color="#FF7811" />
+          <Text style={styles.haveCode}>Have a referral code? Enter it here</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -683,13 +685,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.42,
   },
+  haveCodeBtn: {
+    marginTop: 16,
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#FF7811',
+    backgroundColor: '#FFF6EE',
+  },
   haveCode: {
-    marginTop: 24,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-SemiBold',
     fontSize: 14,
     color: '#FF7811',
-    textDecorationLine: 'underline',
-    letterSpacing: 0.42,
+    letterSpacing: 0.3,
   },
   flex: { flex: 1 },
   backdrop: {

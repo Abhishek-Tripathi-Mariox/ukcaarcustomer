@@ -5,6 +5,10 @@ import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 export interface SendOtpPayload {
   phone: string;
   countryCode: string;
+  /** Re-send to the same number: skips the eligibility pre-check (already
+   *  passed) and forces Firebase to send a fresh SMS instead of answering
+   *  from the in-flight session. */
+  forceResend?: boolean;
 }
 
 export interface VerifyOtpPayload {
@@ -110,8 +114,35 @@ export const authService = {
    */
   sendOtp: async (payload: SendOtpPayload) => {
     const fullPhone = `${payload.countryCode}${payload.phone.replace(/\s/g, '')}`;
+
+    // Ask the backend whether this number may use the CUSTOMER app before
+    // Firebase sends anything. Without this a driver's number gets a real,
+    // billable SMS and only fails after they have waited for it and typed it
+    // in — the refusal has to land here, on the number screen.
+    //
+    // A network failure here must not block a legitimate rider, so we only
+    // stop on an explicit 403. firebase-login enforces the same rules
+    // authoritatively at the end of the flow either way.
+    if (!payload.forceResend) {
+      try {
+        await api.post('/auth/check-eligibility', {
+          phone: payload.phone,
+          countryCode: payload.countryCode,
+          appType: APP_TYPE,
+        });
+      } catch (e: any) {
+        if (e?.response?.status === 403) throw e;
+      }
+    }
+
     try {
-      phoneConfirmation = await auth().signInWithPhoneNumber(fullPhone);
+      // forceResend makes Firebase send a NEW SMS. Without it a second call
+      // for the same number can be answered from the in-flight session, so
+      // "Resend" reset the timer but no code arrived.
+      phoneConfirmation = await auth().signInWithPhoneNumber(
+        fullPhone,
+        payload.forceResend === true,
+      );
       return { success: true };
     } catch (e: any) {
       const err: any = new Error(phoneAuthMessage(e?.code));

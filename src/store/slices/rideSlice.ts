@@ -15,6 +15,8 @@ interface RideState {
    *  amount than the routed fare the rider actually saw. */
   estimateReqId: string | null;
   selectedVehicle: string | null;
+  /** Promo code tapped on the Home "Offers" rail — pre-applied on SelectRide. */
+  pendingPromoCode: string | null;
   currentRide: Ride | null;
   rides: Ride[];
   loading: boolean;
@@ -28,6 +30,7 @@ const initialState: RideState = {
   estimateData: null,
   estimateReqId: null,
   selectedVehicle: null,
+  pendingPromoCode: null,
   currentRide: null,
   rides: [],
   loading: false,
@@ -109,6 +112,7 @@ const rideSlice = createSlice({
     clearDropoff: (state) => { state.dropoff = null; state.estimateData = null; },
     setRideType: (state, action: PayloadAction<RideType>) => { state.rideType = action.payload; },
     setSelectedVehicle: (state, action: PayloadAction<string>) => { state.selectedVehicle = action.payload; },
+    setPendingPromoCode: (state, action: PayloadAction<string | null>) => { state.pendingPromoCode = action.payload; },
     setCurrentRide: (state, action: PayloadAction<Ride | null>) => { state.currentRide = action.payload; },
     clearRide: (state) => {
       state.pickup = null;
@@ -168,5 +172,6 @@ export const {
   clearDropoff,
   clearRide,
   clearError,
+  setPendingPromoCode,
 } = rideSlice.actions;
 export default rideSlice.reducer;

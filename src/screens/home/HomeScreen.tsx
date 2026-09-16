@@ -20,8 +20,8 @@ import { useDefaultPickup } from '@/hooks/useDefaultPickup';
 import { Colors, Typography, Spacing, BorderRadius, Shadow } from '@/theme';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setWalletBalance, refreshNotificationCount } from '@/store/slices/appSlice';
-import { setRideType } from '@/store/slices/rideSlice';
-import { paymentService } from '@/services/paymentService';
+import { setRideType, setPendingPromoCode } from '@/store/slices/rideSlice';
+import { paymentService, PromoOffer } from '@/services/paymentService';
 import { driverService, NearbyDriver } from '@/services/driverService';
 import { rideService } from '@/services/rideService';
 import {
@@ -91,6 +91,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         )[0];
         setPromoOffer(best ?? null);
       })
+      .catch(() => {});
+  }, []);
+
+  // Admin-created promo codes (Promotions page). One card each — riders had no
+  // way to learn a code existed, so promos went unused. Tapping a card stashes
+  // the code in the ride slice and starts a booking; SelectRide applies it.
+  const [promoCodes, setPromoCodes] = useState<PromoOffer[]>([]);
+  useEffect(() => {
+    paymentService
+      .getActivePromos()
+      .then((res) => setPromoCodes(res?.data?.promos ?? []))
       .catch(() => {});
   }, []);
 
@@ -668,6 +679,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <Text style={styles.promoCta}>Recharge now {'\u2192'}</Text>
               </TouchableOpacity>
             )}
+            {promoCodes.map((p) => (
+              <TouchableOpacity
+                key={p._id}
+                style={[styles.promoCard, { backgroundColor: '#F59E0B' }]}
+                activeOpacity={0.9}
+                onPress={() => {
+                  dispatch(setPendingPromoCode(p.code));
+                  navigation.navigate('PlanRide', { rideType: 'instant' });
+                }}
+              >
+                <View style={styles.promoIconWrap}>
+                  <Ionicons name="pricetag-outline" size={22} color="#FFFFFF" />
+                </View>
+                <Text style={styles.promoTitle} numberOfLines={1}>
+                  {p.type === 'percentage' ? `${p.value}% off` : `\u20B9${p.value} off`} · {p.code}
+                </Text>
+                <Text style={styles.promoSub} numberOfLines={2}>
+                  {p.description ||
+                    `Use code ${p.code} on your next ride${
+                      p.minFare ? ` (min fare \u20B9${p.minFare})` : ''
+                    }${p.maxDiscount ? `, up to \u20B9${p.maxDiscount} off` : ''}`}
+                </Text>
+                <Text style={styles.promoCta}>Book a ride {'\u2192'}</Text>
+              </TouchableOpacity>
+            ))}
             <TouchableOpacity
               style={[styles.promoCard, { backgroundColor: '#10B981' }]}
               activeOpacity={0.9}

@@ -197,6 +197,9 @@ export const routeService = {
       driverId: string;
       seats: number[];
       totalAmount?: number;
+      /** Promo code validated on the payment screen. The backend re-validates
+       *  it and charges `totalAmount` (the gross fare) minus the discount. */
+      promoCode?: string;
       /** Per-seat passenger details, persisted so the ticket/history can
        *  show who each seat is for. */
       passengers?: { seat: number; name: string; contact?: string }[];

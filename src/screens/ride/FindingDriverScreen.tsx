@@ -41,6 +41,8 @@ interface FindingDriverScreenProps {
       pickup: string;
       dropoff: string;
       rideType: any;
+      /** Promo code the rider applied on SelectRide — forwarded to createRide. */
+      promoCode?: string;
       /** Set only when RESUMING an existing searching ride on app relaunch —
        *  the screen then waits for that ride instead of creating a new one. */
       rideId?: string;
@@ -57,7 +59,7 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
   navigation,
   route,
 }) => {
-  const { pickup, dropoff, rideType } = route.params;
+  const { pickup, dropoff, rideType, promoCode } = route.params;
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch<AppDispatch>();
   const pickupLoc = useSelector((s: RootState) => s.ride.pickup);
@@ -225,6 +227,7 @@ export const FindingDriverScreen: React.FC<FindingDriverScreenProps> = ({
             // can't be resolved.
             isPrivate: rideType?.tier === 'private' || rideType?.isPrivate === true,
             paymentMethod: 'cash',
+            promoCode: promoCode || undefined,
             // Persist the road distance/duration already quoted to the rider
             // (undefined if the estimate never resolved → backend Haversine).
             distance: estimateData?.distance,

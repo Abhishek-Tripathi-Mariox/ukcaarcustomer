@@ -563,9 +563,12 @@ export const RideTrackingScreen: React.FC<RideTrackingScreenProps> = ({
             <View />
           )}
 
-          {/* Cancel Ride — only while pre-ride; once we're in_progress the
-              driver flow handles cancellation differently. */}
-          {(status === 'driver_assigned' || status === 'driver_arriving') && (
+          {/* Cancel Ride — any time before the trip starts (the backend
+              applies the cancellation fee once the driver has arrived);
+              once we're in_progress the driver flow handles cancellation. */}
+          {(status === 'driver_assigned' ||
+            status === 'driver_arriving' ||
+            status === 'driver_arrived') && (
             <TouchableOpacity
               style={styles.cancelBtn}
               onPress={() => navigation.navigate('CancelReason', { rideId })}

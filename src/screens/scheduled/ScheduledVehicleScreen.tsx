@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   cardActive: { borderColor: Colors.primary, backgroundColor: alpha(Colors.primary, 0.05) },
-  cardDisabled: { backgroundColor: Colors.backgroundDisabled, borderColor: Colors.borderLight, shadowOpacity: 0, elevation: 0 },
+  cardDisabled: { backgroundColor: Colors.backgroundInput, borderColor: Colors.borderLight, shadowOpacity: 0, elevation: 0 },
   cardIcon: {
     width: s(46),
     height: s(46),

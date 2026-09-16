@@ -484,7 +484,16 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
           </Text>
         )}
         {txns?.map((t) => {
-          const isCredit = t.type === 'wallet_topup' || t.status === 'refunded';
+          // Money coming INTO the wallet: recharges, refunds, referral/loyalty
+          // bonuses, incentives and admin "credit" adjustments (admin debits
+          // share the 'adjustment' type — told apart by their description).
+          const isCredit =
+            t.type === 'wallet_topup' ||
+            t.type === 'refund' ||
+            t.type === 'bonus' ||
+            t.type === 'incentive' ||
+            (t.type === 'adjustment' && /credit/i.test(t.description ?? '')) ||
+            t.status === 'refunded';
           const isWalletDebit = !isCredit && t.method === 'wallet';
           const amount = isCredit ? t.walletCredit ?? t.amount : t.amount;
           const failed = t.status === 'failed';
@@ -507,6 +516,14 @@ export const WalletTopUpScreen: React.FC<WalletTopUpScreenProps> = ({ navigation
               ? 'Scheduled Ride'
               : t.type === 'ride_payment'
               ? 'Ride Payment'
+              : t.type === 'refund'
+              ? 'Refund'
+              : t.type === 'bonus'
+              ? 'Bonus Credit'
+              : t.type === 'incentive'
+              ? 'Incentive'
+              : t.type === 'cancellation_fee'
+              ? 'Cancellation Fee'
               : t.type.replace(/_/g, ' '));
           return (
             <View key={t._id} style={styles.txnRow}>

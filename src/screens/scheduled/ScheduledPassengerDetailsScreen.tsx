@@ -35,11 +35,20 @@ interface Props {
   };
 }
 
+export type PassengerGender = 'male' | 'female' | 'other';
+
 export interface Passenger {
   seat: number;
   name: string;
   contact: string;
+  gender?: PassengerGender;
 }
+
+const GENDER_OPTIONS: { value: PassengerGender; label: string }[] = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+];
 
 /**
  * One passenger card per booked seat. The first card is pre-filled with
@@ -80,13 +89,13 @@ export const ScheduledPassengerDetailsScreen: React.FC<Props> = ({ navigation, r
   }, [seats]);
   const [passengers, setPassengers] = useState<Passenger[]>(initialPassengers);
 
-  const updatePassenger = (idx: number, field: 'name' | 'contact', value: string) => {
+  const updatePassenger = (idx: number, field: 'name' | 'contact' | 'gender', value: string) => {
     const next = [...passengers];
     next[idx] = { ...next[idx], [field]: value };
     setPassengers(next);
   };
 
-  const allFilled = passengers.every((p) => p.name.trim() && p.contact.trim());
+  const allFilled = passengers.every((p) => p.name.trim() && p.contact.trim() && !!p.gender);
 
   const handleContinue = () => {
     if (!allFilled) return;
@@ -157,6 +166,23 @@ export const ScheduledPassengerDetailsScreen: React.FC<Props> = ({ navigation, r
                 keyboardType="phone-pad"
                 style={styles.input}
               />
+            </View>
+
+            <Text style={[styles.label, { marginTop: 16 }]}>Gender</Text>
+            <View style={styles.genderRow}>
+              {GENDER_OPTIONS.map((g) => {
+                const on = p.gender === g.value;
+                return (
+                  <TouchableOpacity
+                    key={g.value}
+                    onPress={() => updatePassenger(idx, 'gender', g.value)}
+                    activeOpacity={0.85}
+                    style={[styles.genderChip, on && styles.genderChipOn]}
+                  >
+                    <Text style={[styles.genderChipText, on && styles.genderChipTextOn]}>{g.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         ))}
@@ -253,6 +279,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: s(18),
     height: vs(56),
   },
+  genderRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  genderChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+  },
+  genderChipOn: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
+  genderChipText: { fontSize: 13, color: Colors.textMuted },
+  genderChipTextOn: { color: Colors.primary, fontWeight: '600' },
   input: {
     flex: 1,
     fontFamily: 'Inter-Regular',

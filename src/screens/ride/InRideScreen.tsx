@@ -393,8 +393,19 @@ export const InRideScreen: React.FC<InRideScreenProps> = ({
         </View>
       </View>
 
-      {/* SOS */}
+      {/* Message driver + SOS. Chat used to exist only on the pre-pickup
+          tracking screen, while the driver's chat only existed AFTER pickup —
+          so the two sides could never be in chat at the same time. */}
       <View style={[styles.sosWrap, { paddingBottom: insets.bottom + 16 }]}>
+        {rideId ? (
+          <TouchableOpacity
+            style={styles.chatButton}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Chat', { driver, rideId })}
+          >
+            <Text style={styles.chatText}>Message Driver</Text>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           style={styles.sosButton}
           activeOpacity={0.85}
@@ -529,6 +540,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: s(19),
   },
+  chatButton: {
+    marginBottom: 10,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+  },
+  chatText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   sosButton: {
     backgroundColor: Colors.error,
     borderRadius: s(20),

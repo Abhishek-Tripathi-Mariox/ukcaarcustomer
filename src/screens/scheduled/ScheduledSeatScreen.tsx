@@ -198,11 +198,35 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
-  // Lay seats out in rows of 4 like the existing UI — works for routes
-  // up to ~28 seats (the model caps at totalSeats anyway).
+  // Row shape follows the vehicle's seating capacity instead of a flat 4
+  // per row (which drew a 7-seater SUV as a 4+3 bus). Each row is a list of
+  // seat-count groups; groups are separated by an aisle gap.
+  //   ≤3   auto / hatchback     → one bench
+  //   4    sedan               → 1 front + 3 rear
+  //   5-7  SUV / MUV           → 2 + 3 (+2)
+  //   8-13 tempo traveller     → 1 | 2 per row (aisle)
+  //   14+  bus                 → 2 | 2 per row (aisle)
   const seatRows = useMemo(() => {
-    const rows: Array<typeof seats> = [];
-    for (let i = 0; i < seats.length; i += 4) rows.push(seats.slice(i, i + 4));
+    const n = seats.length;
+    const shape: number[][] =
+      n <= 3 ? [[n]]
+      : n === 4 ? [[1], [3]]
+      : n <= 7 ? [[2], [3], ...(n > 5 ? [[n - 5]] : [])]
+      : n <= 13 ? Array.from({ length: Math.ceil(n / 3) }, () => [1, 2])
+      : Array.from({ length: Math.ceil(n / 4) }, () => [2, 2]);
+    const rows: Array<Array<typeof seats>> = [];
+    let i = 0;
+    for (const groups of shape) {
+      const row: Array<typeof seats> = [];
+      for (const g of groups) {
+        if (i >= n) break;
+        row.push(seats.slice(i, i + g));
+        i += g;
+      }
+      if (row.length) rows.push(row);
+    }
+    // Any remainder from a non-exact shape (e.g. 6 seats → 2+3+1).
+    while (i < n) { rows.push([seats.slice(i, i + 4)]); i += 4; }
     return rows;
   }, [seats]);
 
@@ -280,9 +304,14 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.driverLabel}>Driver</Text>
 
           <View style={styles.grid}>
-            {seatRows.map((rowSeats, rowIdx) => (
+            {seatRows.map((groups, rowIdx) => (
               <View key={rowIdx} style={styles.row}>
-                {rowSeats.map((s) => renderSeat(s.num, s.status))}
+                {groups.map((group, gIdx) => (
+                  <React.Fragment key={gIdx}>
+                    {gIdx > 0 && <View style={styles.aisle} />}
+                    {group.map((s) => renderSeat(s.num, s.status))}
+                  </React.Fragment>
+                ))}
               </View>
             ))}
           </View>
@@ -389,6 +418,7 @@ const styles = StyleSheet.create({
 
   grid: { gap: s(16), alignItems: 'center' },
   row: { flexDirection: 'row', gap: s(17) },
+  aisle: { width: s(22) },
 
   seatTile: {
     width: s(74),

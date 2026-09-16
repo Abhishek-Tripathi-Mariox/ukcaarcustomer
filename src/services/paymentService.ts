@@ -17,6 +17,18 @@ export interface PaymentRecord {
   createdAt: string;
 }
 
+/** An admin-created promo code the rider can use right now. */
+export interface PromoOffer {
+  _id: string;
+  code: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  description?: string;
+  minFare?: number;
+  maxDiscount?: number;
+  expiresAt: string;
+}
+
 export interface SavedMethod {
   _id: string;
   type: 'credit_card' | 'debit_card' | 'upi' | 'wallet';
@@ -172,6 +184,12 @@ export const paymentService = {
   // Promo
   validatePromo: async (code: string) => {
     const { data } = await api.post('/payments/promo/validate', { code });
+    return data;
+  },
+
+  // Promo codes the rider can use right now (admin Promotions page).
+  getActivePromos: async (): Promise<{ success: boolean; data: { promos: PromoOffer[] } }> => {
+    const { data } = await api.get('/payments/promo/active');
     return data;
   },
 };

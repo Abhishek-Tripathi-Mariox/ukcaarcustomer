@@ -32,6 +32,17 @@ import {
 import { routeService, type ScheduledRouteApi } from '@/services/routeService';
 import { rideService } from '@/services/rideService';
 
+
+// Dial with visible failure: openURL rejects on some diallers (stray
+// punctuation, no telephony) and the silent .catch made the tap look dead —
+// same bug class as the driver app's call buttons.
+const dialSafe = (raw: string) => {
+  const phone = raw.replace(/[\s\-()]/g, '');
+  Linking.openURL(`tel:${phone}`).catch(() =>
+    Alert.alert('Could not start the call', `Dial ${phone} manually.`),
+  );
+};
+
 interface LatLng {
   lat: number;
   lng: number;
@@ -261,7 +272,7 @@ export const ScheduledLiveTrackScreen: React.FC<Props> = ({ navigation, route })
       Alert.alert('Number unavailable', 'We don’t have a phone number to call right now.');
       return;
     }
-    Linking.openURL(`tel:${phone}`).catch(() => {});
+    dialSafe(phone);
   };
 
   const submitRequest = async () => {

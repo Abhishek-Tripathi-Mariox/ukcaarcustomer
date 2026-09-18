@@ -430,6 +430,19 @@ export const ScheduledTripHubScreen: React.FC<Props> = ({ navigation, route }) =
               <View style={styles.reminder}>
                 <Text style={styles.reminderText}>We'll remind you before departure. Live tracking opens closer to departure.</Text>
               </View>
+              {/* Shown disabled rather than hidden: riders reported tracking as
+                  "not available" when the button simply wasn't on the screen
+                  yet. It activates by itself once the shuttle sets off. */}
+              <PrimaryBtn
+                label={
+                  status?.departureTime
+                    ? `Tracking starts at ${status.departureTime}`
+                    : 'Tracking starts at departure'
+                }
+                icon="navigate"
+                onPress={() => {}}
+                disabled
+              />
               <OutlineBtn label="Show Ticket / QR" icon="qr-code-outline" onPress={openTicket} />
               <TextBtn label="Cancel Ride" tint={Colors.error} onPress={cancelBooking} />
               <Text style={styles.cancelNote}>
@@ -592,8 +605,21 @@ const DRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   </View>
 );
 
-const PrimaryBtn: React.FC<{ label: string; icon?: string; onPress: () => void }> = ({ label, icon, onPress }) => (
-  <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={onPress}>
+const PrimaryBtn: React.FC<{
+  label: string;
+  icon?: string;
+  onPress: () => void;
+  /** Rendered greyed-out and inert — used for "Tracking starts at …" before
+   *  the driver begins the journey, so the action is visibly there rather
+   *  than missing from the screen entirely. */
+  disabled?: boolean;
+}> = ({ label, icon, onPress, disabled }) => (
+  <TouchableOpacity
+    style={[styles.primaryBtn, disabled && styles.primaryBtnDisabled]}
+    activeOpacity={0.85}
+    onPress={onPress}
+    disabled={disabled}
+  >
     {icon && <Ionicons name={icon as any} size={s(18)} color={Colors.white} />}
     <Text style={styles.primaryBtnText}>{label}</Text>
   </TouchableOpacity>
@@ -692,6 +718,7 @@ const styles = StyleSheet.create({
 
   primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(8), height: vs(54), borderRadius: s(14), backgroundColor: Colors.primary, marginTop: vs(16) },
   primaryBtnText: { fontFamily: 'Inter-SemiBold', fontSize: fs(16), color: Colors.white },
+  primaryBtnDisabled: { backgroundColor: alpha(Colors.primary, 0.45) },
   outlineBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(8), height: vs(52), borderRadius: s(14), borderWidth: 1.5, borderColor: Colors.primary, marginTop: vs(12) },
   outlineBtnText: { fontFamily: 'Inter-SemiBold', fontSize: fs(15), color: Colors.primary },
   textBtn: { height: vs(46), alignItems: 'center', justifyContent: 'center', marginTop: vs(8) },

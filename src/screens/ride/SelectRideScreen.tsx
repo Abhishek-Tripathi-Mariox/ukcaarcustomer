@@ -51,8 +51,12 @@ interface SelectRideScreenProps {
 // code AND display name. Admins name types freely ("Two Wheeler", "Auto
 // Rickshaw", "Scooty"), which the old code-only bike/auto match missed — every
 // type then fell through to the car icon.
-const TWO_WHEELER = /\b(bike|moto|motorcycle|scoot|two[\s-]?wheel|2[\s-]?wheel|2w|cycle)/i;
-const THREE_WHEELER = /\b(auto|rick|tuk|three[\s-]?wheel|3[\s-]?wheel|3w|tempo)/i;
+const TWO_WHEELER = /\b(bike|moto|motorcycle|scoot|two[\s-]?wheel|2[\s-]?wheel|2w)/i;
+const THREE_WHEELER = /\b(auto|rick|tuk|three[\s-]?wheel|3[\s-]?wheel|3w)/i;
+// Vans/minibuses. Kept OUT of THREE_WHEELER: "Tempo Traveller" is a 12-seater
+// van, and matching it as an auto-rickshaw showed the wrong art AND (because
+// the seat fallback shares these patterns) "3 Seats" instead of 12.
+const VAN = /\b(tempo|traveller|traveler|van|minibus|mini[\s-]?bus)/i;
 const PREMIUM = /\b(premium|luxury|prime|suv|xl|muv|black|exec)/i;
 
 function renderVehicleArt(
@@ -78,6 +82,11 @@ function renderVehicleArt(
       />
     );
   }
+  // Vans have no dedicated art — the car silhouette reads better for them
+  // than the premium sedan, so check this before PREMIUM ("XL"/"traveller").
+  if (VAN.test(c)) {
+    return <TaxiBIcon size={size} />;
+  }
   if (PREMIUM.test(c)) {
     return <TaxiAIcon size={size} />;
   }
@@ -90,10 +99,10 @@ function seatsForCode(code: string): number {
   const c = code.toLowerCase();
   if (TWO_WHEELER.test(c)) return 1;
   if (THREE_WHEELER.test(c)) return 3;
-  if (c.includes('hatch')) return 4;
-  if (c.includes('sedan')) return 4;
+  // Vans before the car sizes — a Tempo Traveller seats 12, not 4/6.
+  if (VAN.test(c)) return 12;
   if (c.includes('muv') || c.includes('suv')) return 6;
-  if (c.includes('tempo') || c.includes('traveller')) return 12;
+  if (c.includes('hatch') || c.includes('sedan')) return 4;
   return 4;
 }
 

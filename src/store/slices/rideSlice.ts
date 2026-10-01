@@ -45,6 +45,7 @@ export const estimateFare = createAsyncThunk(
       dropoff,
       distance,
       duration,
+      promoCode,
     }: {
       pickup: Location;
       dropoff: Location;
@@ -54,11 +55,13 @@ export const estimateFare = createAsyncThunk(
       // on SelectRide in sync with the time chip on the map.
       distance?: number;
       duration?: number;
+      /** Preview a promo code — the server prices it into every estimate. */
+      promoCode?: string;
     },
     { rejectWithValue },
   ) => {
     try {
-      return await rideService.estimateFare(pickup, dropoff, { distance, duration });
+      return await rideService.estimateFare(pickup, dropoff, { distance, duration, promoCode });
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to get estimate');
     }

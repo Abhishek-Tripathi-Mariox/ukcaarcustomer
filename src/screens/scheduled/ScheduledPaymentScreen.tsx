@@ -266,7 +266,22 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
         } catch (bookErr: any) {
           const bs = bookErr?.response?.status;
           const bd = bookErr?.response?.data;
-          if (bs === 409) {
+          if (bd?.code === 'FARE_CHANGED') {
+            // The route's fares changed while booking. Nothing was taken from
+            // the wallet; start again from the route so the new fare loads.
+            Alert.alert('Fare Updated', bd.message || 'The fare for this trip has changed.', [
+              {
+                text: 'Review again',
+                // Back to stop selection (always in the stack) with a fresh
+                // key so it reloads the route and its new fares.
+                onPress: () =>
+                  navigation.navigate('ScheduledBoardingDrop', {
+                    route: scheduledRoute,
+                    refreshKey: Date.now(),
+                  }),
+              },
+            ]);
+          } else if (bs === 409) {
             const conflicts: number[] = bd?.data?.conflicts ?? [];
             Alert.alert(
               'Seats Unavailable',
@@ -286,9 +301,12 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
       }
 
       // ── 2. Pay via Razorpay Gateway (UPI, Cards, Google Pay, PhonePe, NetBanking) ──
+      // Tagged as a seat-booking order: the server only accepts a
+      // 'scheduled_booking' payment as proof of payment for seats.
       const orderRes = await paymentService.createOrder({
         amount: payable,
-        type: 'ride_payment',
+        type: 'scheduled_booking',
+        scheduledRouteId: scheduledRoute.id,
       });
 
       if (!orderRes.success) {
@@ -342,6 +360,8 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
           seats,
           totalAmount: total,
           promoCode: promoCodeToSend,
+          // Links the booking to the payment the server just verified.
+          razorpayOrderId: orderId,
           passengers,
           boardingStopSequence: boarding.sequence,
           droppingStopSequence: dropping.sequence,
@@ -365,7 +385,22 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
       } catch (bookErr: any) {
         const bs = bookErr?.response?.status;
         const bd = bookErr?.response?.data;
-        if (bs === 409) {
+        if (bd?.code === 'FARE_CHANGED') {
+          Alert.alert(
+            'Payment Received',
+            `${bd.message || 'The fare for this trip has changed.'} Your payment was received but not used for a booking — our support team will refund it.`,
+            [
+              {
+                text: 'OK',
+                onPress: () =>
+                  navigation.navigate('ScheduledBoardingDrop', {
+                    route: scheduledRoute,
+                    refreshKey: Date.now(),
+                  }),
+              },
+            ],
+          );
+        } else if (bs === 409) {
           const conflicts: number[] = bd?.data?.conflicts ?? [];
           Alert.alert(
             'Seats Unavailable',

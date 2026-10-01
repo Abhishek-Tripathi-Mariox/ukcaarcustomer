@@ -143,9 +143,26 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
   const surgeCharge = n((ride as any)?.surgeFare, 0);
   const discount = n(ride?.discount, 0);
   const tip = n((ride as any)?.tip, 0);
+  // What this screen charges. The tip is NOT part of it — a tip is debited
+  // from the wallet on its own — so it's shown after the total, not inside it.
   const totalFare = n(
     ride?.actualFare ?? ride?.estimatedFare ?? fare,
-    baseFare + distanceCharge + timeCharge + surgeCharge - discount + tip,
+    baseFare + distanceCharge + timeCharge + surgeCharge - discount,
+  );
+  // On a short ride the vehicle's minimum fare lifts the total above
+  // base + distance + time, and that top-up had no row — so the receipt
+  // didn't add up. Show it explicitly.
+  // An admin fare adjustment (support changed the fare) is its own signed row
+  // so it isn't mistaken for the minimum-fare top-up.
+  const fareAdjustment = n((ride as any)?.fareAdjustment, 0);
+  const minFareAdjustment = Math.max(
+    0,
+    Math.round(
+      (totalFare -
+        (baseFare + distanceCharge + timeCharge + surgeCharge - discount) -
+        fareAdjustment) *
+        100,
+    ) / 100,
   );
   const tripDistance = n(ride?.actualDistance ?? ride?.estimatedDistance ?? distance, 0);
 
@@ -269,7 +286,17 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
         razorpay_payment_id: paymentData.razorpay_payment_id,
         razorpay_signature: paymentData.razorpay_signature,
       });
-      if (verifyRes.success) {
+      if (verifyRes.success && verifyRes.data?.refundedToWallet) {
+        // The ride had already been paid (cash to the driver, or the wallet),
+        // so this card payment went to the rider's UKCAAR wallet instead.
+        const newBalance = Number(verifyRes.data?.wallet?.balance);
+        if (Number.isFinite(newBalance)) dispatch(setWalletBalance(newBalance));
+        Alert.alert(
+          'Ride already paid',
+          `This ride had already been paid, so ₹${Number(verifyRes.data.refundedToWallet).toFixed(2)} has been added to your UKCAAR wallet.`,
+          [{ text: 'OK', onPress: () => navigation.popToTop() }],
+        );
+      } else if (verifyRes.success) {
         navigation.replace('PaymentSuccess', {
           amount: totalFare,
           method: 'razorpay',
@@ -326,6 +353,11 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
             { text: 'Pay online', onPress: payWithRazorpay },
           ],
         );
+      } else if (err?.response?.status === 409) {
+        // Paid by cash or card in the meantime — nothing was taken.
+        Alert.alert('Ride already paid', msg, [
+          { text: 'OK', onPress: () => navigation.popToTop() },
+        ]);
       } else {
         Alert.alert('Payment failed', msg);
       }
@@ -482,12 +514,23 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
             </View>
           )}
 
-          {tip > 0 && (
+          {minFareAdjustment >= 0.01 && (
             <View style={[styles.chargeRow, { marginTop: 8 }]}>
-              <Text style={styles.chargeLabel}>Tip</Text>
+              <Text style={styles.chargeLabel}>Minimum fare adjustment</Text>
               <Text style={styles.chargeValue}>
                 {'\u20B9'}
-                {tip.toFixed(2)}
+                {minFareAdjustment.toFixed(2)}
+              </Text>
+            </View>
+          )}
+
+          {Math.abs(fareAdjustment) >= 0.01 && (
+            <View style={[styles.chargeRow, { marginTop: 8 }]}>
+              <Text style={styles.chargeLabel}>Fare adjustment</Text>
+              <Text style={styles.chargeValue}>
+                {fareAdjustment < 0 ? '-' : ''}
+                {'\u20B9'}
+                {Math.abs(fareAdjustment).toFixed(2)}
               </Text>
             </View>
           )}
@@ -511,6 +554,16 @@ export const RideCompleteScreen: React.FC<RideCompleteScreenProps> = ({
               {totalFare.toFixed(2)}
             </Text>
           </View>
+
+          {tip > 0 && (
+            <View style={[styles.chargeRow, { marginTop: 8 }]}>
+              <Text style={styles.chargeLabel}>Tip (paid from wallet)</Text>
+              <Text style={styles.chargeValue}>
+                {'\u20B9'}
+                {tip.toFixed(2)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Proceed to Payment */}

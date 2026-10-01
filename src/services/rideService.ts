@@ -97,6 +97,9 @@ export interface EstimateResponse {
     estimatedFare: number;
     /** ₹ already removed from estimatedFare by the rider's loyalty (tier + voucher). */
     loyaltyDiscount?: number;
+    /** ₹ the previewed promo code takes off this type (already removed from
+     *  estimatedFare). 0 when the code doesn't qualify for this ride. */
+    promoDiscount?: number;
     baseFare: number;
     distanceFare: number;
     timeFare: number;
@@ -110,13 +113,17 @@ export interface EstimateResponse {
     tierPct: number;
     voucher: { code: string; type: string; value: number } | null;
   };
+  /** The promo priced into these estimates (when a code was sent). */
+  promo?: { code: string; minFare?: number } | null;
+  /** Why a sent promo code wasn't applied (expired, already used…). */
+  promoError?: string;
 }
 
 export const rideService = {
   estimateFare: async (
     pickup: Location,
     dropoff: Location,
-    opts?: { distance?: number; duration?: number },
+    opts?: { distance?: number; duration?: number; promoCode?: string },
   ): Promise<EstimateResponse> => {
     // When the caller has already resolved a real-route distance/duration
     // (via /geo/directions on the map), forward them so the backend skips
@@ -130,6 +137,9 @@ export const rideService = {
     if (opts?.duration !== undefined && opts.duration !== null) {
       body.duration = opts.duration;
     }
+    // The server prices the promo with the same code that books the ride, so
+    // the previewed fare is the charged fare (surge and minimum fare included).
+    if (opts?.promoCode) body.promoCode = opts.promoCode;
     const { data } = await api.post('/rides/estimate', body);
     return data.data;
   },
@@ -223,4 +233,7 @@ export interface NearbyVehicleType {
   /** Admin-configured passenger seat capacity. Undefined until an admin sets
    *  it on the vehicle type, in which case the app uses a code heuristic. */
   seats?: number;
+  /** Admin-uploaded artwork for this type. Undefined until an admin uploads
+   *  one, in which case the app draws its own bundled art instead. */
+  iconUrl?: string;
 }

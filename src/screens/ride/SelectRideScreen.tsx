@@ -60,9 +60,21 @@ const VAN = /\b(tempo|traveller|traveler|van|minibus|mini[\s-]?bus)/i;
 const PREMIUM = /\b(premium|luxury|prime|suv|xl|muv|black|exec)/i;
 
 function renderVehicleArt(
-  type: { code: string; name?: string },
+  type: { code: string; name?: string; iconUrl?: string },
   size: number,
 ): React.ReactElement {
+  // An admin-uploaded icon always wins: the matching below can only pick from
+  // four bundled artworks, so a type whose name it doesn't recognise would
+  // otherwise fall back to the generic car.
+  if (type.iconUrl) {
+    return (
+      <Image
+        source={{ uri: type.iconUrl }}
+        style={{ width: size, height: size }}
+        resizeMode="contain"
+      />
+    );
+  }
   const c = `${type.code} ${type.name ?? ''}`;
   if (TWO_WHEELER.test(c)) {
     return (
@@ -152,17 +164,14 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
   // Outside-service-area refusal from the backend geofence (only enforced
   // once admins draw a "Service area" zone). Shown in place of the ride list
   // and blocks Book, so the rider finds out here rather than after booking.
+  // (The estimate request itself lives below the promo block — it sends the
+  // applied code so the server prices the discount.)
   const [areaError, setAreaError] = useState<string | null>(null);
+  // Cleared only when the trip itself changes. Route or promo re-estimates
+  // used to clear it, which re-enabled Book for an out-of-area trip.
   useEffect(() => {
-    if (pickupLoc && dropoffLoc) {
-      setAreaError(null);
-      dispatch(estimateFare({ pickup: pickupLoc, dropoff: dropoffLoc }))
-        .unwrap()
-        .catch((msg: unknown) => {
-          if (typeof msg === 'string' && /service area/i.test(msg)) setAreaError(msg);
-        });
-    }
-  }, [pickupLoc, dropoffLoc, dispatch]);
+    setAreaError(null);
+  }, [pickupLoc?.lat, pickupLoc?.lng, dropoffLoc?.lat, dropoffLoc?.lng]);
 
   // Pull nearby vehicle types as soon as we have a pickup location.
   useEffect(() => {
@@ -230,19 +239,11 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
       )
       .then((d) => {
         if (cancelled || !d) return;
+        // The estimate effect (below the promo block) re-prices on this, so
+        // one request always carries BOTH the routed distance and the applied
+        // promo. This effect used to fire its own promo-less estimate that
+        // could land last and wipe the promo from every card.
         setDirections(d);
-        const distanceKm = d.distanceMeters / 1000;
-        const durationMin = d.durationSeconds / 60;
-        if (Number.isFinite(distanceKm) && Number.isFinite(durationMin)) {
-          dispatch(
-            estimateFare({
-              pickup: pickupLoc,
-              dropoff: dropoffLoc,
-              distance: distanceKm,
-              duration: durationMin,
-            }),
-          );
-        }
       });
     return () => {
       cancelled = true;
@@ -355,22 +356,44 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPromo]);
 
-  // Preview of what the backend will take off (it caps at maxDiscount and at
-  // 50% of the fare, and ignores the code under minFare).
-  const promoDiscount = (() => {
-    if (!promoApplied || !selectedEstimate) return 0;
-    const fare = selectedEstimate.estimatedFare;
-    if (promoApplied.minFare && fare < promoApplied.minFare) return 0;
-    const cap =
-      promoApplied.maxDiscount && promoApplied.maxDiscount > 0
-        ? promoApplied.maxDiscount
-        : Infinity;
-    const raw =
-      promoApplied.type === 'percentage'
-        ? (fare * promoApplied.value) / 100
-        : promoApplied.value;
-    return Math.max(0, Math.min(raw, cap, fare * 0.5));
-  })();
+  // Fare estimates — re-requested whenever the applied promo changes, so every
+  // card price and the discount below come from the server's own pricing.
+  // (This screen used to work the discount out itself: it took the % of the
+  // post-surge fare while the server takes it of the pre-surge fare, and it
+  // ignored the minimum fare — so under surge it promised more than it gave.)
+  const appliedPromoCode = promoApplied?.code;
+  // Routed distance/duration, rounded exactly like the estimate response
+  // (0.1 km, whole minutes). FindingDriver books with those rounded values,
+  // so pricing the estimate on them too makes preview and charge identical.
+  const routedKm =
+    directions && Number.isFinite(directions.distanceMeters)
+      ? Math.max(0.1, Math.round(directions.distanceMeters / 100) / 10)
+      : undefined;
+  const routedMin =
+    directions && Number.isFinite(directions.durationSeconds)
+      ? Math.max(1, Math.round(directions.durationSeconds / 60))
+      : undefined;
+  useEffect(() => {
+    if (pickupLoc && dropoffLoc) {
+      dispatch(
+        estimateFare({
+          pickup: pickupLoc,
+          dropoff: dropoffLoc,
+          ...(routedKm !== undefined && routedMin !== undefined
+            ? { distance: routedKm, duration: routedMin }
+            : {}),
+          promoCode: appliedPromoCode,
+        }),
+      )
+        .unwrap()
+        .catch((msg: unknown) => {
+          if (typeof msg === 'string' && /service area/i.test(msg)) setAreaError(msg);
+        });
+    }
+  }, [pickupLoc, dropoffLoc, routedKm, routedMin, appliedPromoCode, dispatch]);
+
+  // Exactly what the server took off the selected ride (0 = doesn't qualify).
+  const promoDiscount = selectedEstimate?.promoDiscount ?? 0;
 
   const handleConfirm = () => {
     if (!selectedType || areaError) return;
@@ -381,7 +404,9 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
     navigation.navigate('FindingDriver', {
       pickup,
       dropoff,
-      promoCode: promoApplied?.code,
+      // The promo the shown fares were actually priced with (the server echoes
+      // it), so the booking can't apply a code the cards don't reflect.
+      promoCode: estimateData?.promo?.code,
       rideType: {
         id: selectedType.code,
         name: selectedType.name,
@@ -625,10 +650,12 @@ export const SelectRideScreen: React.FC<SelectRideScreenProps> = ({
           <TouchableOpacity
             style={[
               styles.bookButton,
-              (!selectedRide || !!areaError) && styles.bookButtonDisabled,
+              (!selectedRide || !!areaError || loading) && styles.bookButtonDisabled,
             ]}
             onPress={handleConfirm}
-            disabled={!selectedRide || !!areaError}
+            // Also wait for the estimate in flight: booking from the previous
+            // one could charge a fare the rider no longer sees.
+            disabled={!selectedRide || !!areaError || loading}
             activeOpacity={0.85}
           >
             <FlashIcon size={18} color={Colors.white} />

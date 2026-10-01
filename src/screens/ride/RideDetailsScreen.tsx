@@ -96,10 +96,28 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
     const surgeCharge = n(ride.surgeFare, 0);
     const discount = n(ride.discount, 0);
     const tip = n(ride.tip, 0);
-    const totalFare = n(
+    // The ride fare (what the trip cost) and the total the rider paid, which
+    // adds any tip — tips are charged separately and aren't in actualFare, so
+    // listing the tip row while showing actualFare as the total never added up.
+    const rideFare = n(
       ride.actualFare ?? ride.estimatedFare,
-      baseFare + distanceCharge + timeCharge + surgeCharge - discount + tip,
+      baseFare + distanceCharge + timeCharge + surgeCharge - discount,
     );
+    // Short rides are lifted to the vehicle's minimum fare; that top-up had
+    // no row on the receipt.
+    // Admin fare adjustments are their own signed row, not part of the
+    // minimum-fare top-up.
+    const fareAdjustment = n((ride as any).fareAdjustment, 0);
+    const minFareAdjustment = Math.max(
+      0,
+      Math.round(
+        (rideFare -
+          (baseFare + distanceCharge + timeCharge + surgeCharge - discount) -
+          fareAdjustment) *
+          100,
+      ) / 100,
+    );
+    const totalFare = Math.round((rideFare + tip) * 100) / 100;
     const tripDistance = n(ride.actualDistance ?? ride.estimatedDistance, 0);
     const tripDuration = n(ride.actualDuration ?? ride.estimatedDuration, 0);
     return {
@@ -109,6 +127,8 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
       surgeCharge,
       discount,
       tip,
+      minFareAdjustment,
+      fareAdjustment,
       totalFare,
       tripDistance,
       tripDuration,
@@ -138,6 +158,14 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
     if (breakdown.surgeCharge > 0)
       rows.push(
         `<tr><td>Surge</td><td class="r">₹${breakdown.surgeCharge.toFixed(2)}</td></tr>`,
+      );
+    if (breakdown.minFareAdjustment >= 0.01)
+      rows.push(
+        `<tr><td>Minimum fare adjustment</td><td class="r">₹${breakdown.minFareAdjustment.toFixed(2)}</td></tr>`,
+      );
+    if (Math.abs(breakdown.fareAdjustment) >= 0.01)
+      rows.push(
+        `<tr><td>Fare adjustment</td><td class="r">${breakdown.fareAdjustment < 0 ? '-' : ''}₹${Math.abs(breakdown.fareAdjustment).toFixed(2)}</td></tr>`,
       );
     if (breakdown.tip > 0)
       rows.push(`<tr><td>Tip</td><td class="r">₹${breakdown.tip.toFixed(2)}</td></tr>`);
@@ -233,6 +261,12 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
       lines.push(`  Time: ₹${breakdown.timeCharge.toFixed(2)}`);
     if (breakdown.surgeCharge > 0)
       lines.push(`  Surge: ₹${breakdown.surgeCharge.toFixed(2)}`);
+    if (breakdown.minFareAdjustment >= 0.01)
+      lines.push(`  Minimum fare adjustment: ₹${breakdown.minFareAdjustment.toFixed(2)}`);
+    if (Math.abs(breakdown.fareAdjustment) >= 0.01)
+      lines.push(
+        `  Fare adjustment: ${breakdown.fareAdjustment < 0 ? '-' : ''}₹${Math.abs(breakdown.fareAdjustment).toFixed(2)}`,
+      );
     if (breakdown.tip > 0) lines.push(`  Tip: ₹${breakdown.tip.toFixed(2)}`);
     if (breakdown.discount > 0)
       lines.push(`  Discount: -₹${breakdown.discount.toFixed(2)}`);
@@ -408,6 +442,20 @@ export const RideDetailsScreen: React.FC<RideDetailsScreenProps> = ({ navigation
               <View style={styles.fareRow}>
                 <Text style={styles.fareItemLabel}>Surge Charge</Text>
                 <Text style={styles.fareItemValue}>₹{breakdown.surgeCharge.toFixed(0)}</Text>
+              </View>
+            )}
+            {breakdown.minFareAdjustment >= 0.01 && (
+              <View style={styles.fareRow}>
+                <Text style={styles.fareItemLabel}>Minimum fare adjustment</Text>
+                <Text style={styles.fareItemValue}>₹{breakdown.minFareAdjustment.toFixed(0)}</Text>
+              </View>
+            )}
+            {Math.abs(breakdown.fareAdjustment) >= 0.01 && (
+              <View style={styles.fareRow}>
+                <Text style={styles.fareItemLabel}>Fare adjustment</Text>
+                <Text style={styles.fareItemValue}>
+                  {breakdown.fareAdjustment < 0 ? '-' : ''}₹{Math.abs(breakdown.fareAdjustment).toFixed(0)}
+                </Text>
               </View>
             )}
             {breakdown.tip > 0 && (

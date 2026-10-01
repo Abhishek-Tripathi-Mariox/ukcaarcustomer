@@ -200,6 +200,10 @@ export const routeService = {
       /** Promo code validated on the payment screen. The backend re-validates
        *  it and charges `totalAmount` (the gross fare) minus the discount. */
       promoCode?: string;
+      /** Razorpay order that paid for these seats. Required for online
+       *  payment: the server checks the verified payment covers the fare and
+       *  hasn't already paid for another booking. */
+      razorpayOrderId?: string;
       /** Per-seat passenger details, persisted so the ticket/history can
        *  show who each seat is for. */
       passengers?: { seat: number; name: string; contact?: string }[];

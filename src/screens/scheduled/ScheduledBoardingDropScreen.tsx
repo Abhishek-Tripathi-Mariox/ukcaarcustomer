@@ -28,7 +28,7 @@ interface Stop {
 
 interface Props {
   navigation: any;
-  route: { params: { route: ScheduledRoute } };
+  route: { params: { route: ScheduledRoute; /** Changes force a route reload (fare updated). */ refreshKey?: number } };
 }
 
 /**
@@ -81,7 +81,9 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
     return () => {
       cancelled = true;
     };
-  }, [scheduledRoute.id]);
+    // refreshKey: the payment screen sends a new one when the server reports
+    // the route's fares changed, so the new fare is loaded before rebooking.
+  }, [scheduledRoute.id, route.params?.refreshKey]);
 
   // Pick the next-upcoming departure slot. We surface both the index
   // (needed by the booking endpoints to identify which slot the rider

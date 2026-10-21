@@ -1,13 +1,13 @@
 import api, { setTokens, clearTokens } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { USE_FIREBASE_PHONE_AUTH } from './authConfig';
 
 export interface SendOtpPayload {
   phone: string;
   countryCode: string;
-  /** Re-send to the same number: skips the eligibility pre-check (already
-   *  passed) and forces Firebase to send a fresh SMS instead of answering
-   *  from the in-flight session. */
+  /** In Firebase mode, skips the passed eligibility pre-check and forces a
+   *  fresh SMS. Backend mode always calls send-otp again. */
   forceResend?: boolean;
 }
 
@@ -108,11 +108,20 @@ const phoneAuthMessage = (code?: string): string => {
 
 export const authService = {
   /**
-   * Asks Firebase to text a verification code. Google sends the SMS from
-   * their own registered sender, which is why UKCAAR needs no TRAI DLT
-   * registration for login. Nothing hits our backend on this step.
+   * Uses the backend OTP flow during testing. Its send-otp endpoint applies
+   * the customer-role and suspension guards before issuing a code.
    */
   sendOtp: async (payload: SendOtpPayload) => {
+    if (!USE_FIREBASE_PHONE_AUTH) {
+      phoneConfirmation = null;
+      const { data } = await api.post('/auth/send-otp', {
+        phone: payload.phone.replace(/\s/g, ''),
+        countryCode: payload.countryCode,
+        appType: APP_TYPE,
+      });
+      return data;
+    }
+
     const fullPhone = `${payload.countryCode}${payload.phone.replace(/\s/g, '')}`;
 
     // Ask the backend whether this number may use the CUSTOMER app before
@@ -152,35 +161,47 @@ export const authService = {
   },
 
   /**
-   * Confirms the code with Firebase, then trades the resulting ID token for
-   * our own session at /auth/firebase-login. The code itself never reaches
-   * our server.
+   * Verifies with the selected provider, then applies the same customer-role
+   * guard and session persistence to either backend response.
    */
   verifyOtp: async (payload: VerifyOtpPayload): Promise<AuthResponse> => {
-    if (!phoneConfirmation) {
-      const err: any = new Error('Your session expired. Please request a new code.');
-      err.response = { status: 400, data: { message: err.message } };
-      throw err;
+    let data: AuthResponse;
+    if (!USE_FIREBASE_PHONE_AUTH) {
+      phoneConfirmation = null;
+      const response = await api.post<AuthResponse>('/auth/verify-otp', {
+        phone: payload.phone.replace(/\s/g, ''),
+        countryCode: payload.countryCode,
+        otp: payload.otp,
+        appType: APP_TYPE,
+      });
+      data = response.data;
+    } else {
+      if (!phoneConfirmation) {
+        const err: any = new Error('Your session expired. Please request a new code.');
+        err.response = { status: 400, data: { message: err.message } };
+        throw err;
+      }
+
+      let idToken: string;
+      try {
+        const credential = await phoneConfirmation.confirm(payload.otp);
+        if (!credential?.user) throw new Error('no user');
+        idToken = await credential.user.getIdToken();
+      } catch (e: any) {
+        const err: any = new Error(phoneAuthMessage(e?.code));
+        err.response = { status: 400, data: { message: err.message } };
+        throw err;
+      }
+
+      // One-shot: a confirmed handle cannot be reused for another attempt.
+      phoneConfirmation = null;
+
+      const response = await api.post<AuthResponse>('/auth/firebase-login', {
+        idToken,
+        appType: APP_TYPE,
+      });
+      data = response.data;
     }
-
-    let idToken: string;
-    try {
-      const credential = await phoneConfirmation.confirm(payload.otp);
-      if (!credential?.user) throw new Error('no user');
-      idToken = await credential.user.getIdToken();
-    } catch (e: any) {
-      const err: any = new Error(phoneAuthMessage(e?.code));
-      err.response = { status: 400, data: { message: err.message } };
-      throw err;
-    }
-
-    // One-shot: a confirmed handle cannot be reused for another attempt.
-    phoneConfirmation = null;
-
-    const { data } = await api.post<AuthResponse>('/auth/firebase-login', {
-      idToken,
-      appType: APP_TYPE,
-    });
     // Defence in depth: even if an older backend (without the server-side role
     // guard) hands us a driver account, refuse it and drop the tokens the
     // request just persisted, so no driver session survives in the customer app.

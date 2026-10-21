@@ -89,3 +89,17 @@ expo-env.d.ts
 android/keystore.properties
 *.keystore
 !android/app/debug.keystore
+
+# Local tests and test output
+__tests__/
+__mocks__/
+test/
+tests/
+*.test.*
+*.spec.*
+jest.config.*
+jest.setup.*
+setupTests.*
+coverage/
+test-results/
+playwright-report/

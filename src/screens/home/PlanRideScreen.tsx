@@ -457,7 +457,7 @@ export const PlanRideScreen: React.FC<any> = ({ navigation, route }: PlanRideScr
         const ui = api.map(routeToUi);
         setRoutes(ui);
         setSelectedRouteId((prev) =>
-          prev && ui.some((r) => r.id === prev) ? prev : ui.length ? ui[0].id : null,
+          prev && ui.some((r) => (r.selectionKey ?? r.id) === prev) ? prev : ui.length ? ui[0].selectionKey ?? ui[0].id : null,
         );
       })
       .catch((err) => {
@@ -474,7 +474,7 @@ export const PlanRideScreen: React.FC<any> = ({ navigation, route }: PlanRideScr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isScheduled, pickupKey, dropKey, pickupPincode, dropPincode, currentPincode]);
 
-  const selectedRoute = routes?.find((r) => r.id === selectedRouteId) ?? null;
+  const selectedRoute = routes?.find((r) => (r.selectionKey ?? r.id) === selectedRouteId) ?? null;
 
   // Show routes whenever the rider isn't actively searching an address. They
   // narrow as stops are added rather than only appearing at the very end.
@@ -639,7 +639,7 @@ export const PlanRideScreen: React.FC<any> = ({ navigation, route }: PlanRideScr
       {showRoutes ? (
         <FlatList
           data={routes ?? []}
-          keyExtractor={(r) => r.id}
+          keyExtractor={(r) => r.selectionKey ?? r.id}
           keyboardShouldPersistTaps="handled"
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
@@ -664,12 +664,12 @@ export const PlanRideScreen: React.FC<any> = ({ navigation, route }: PlanRideScr
             )
           }
           renderItem={({ item: r }) => {
-            const active = r.id === selectedRouteId;
+            const active = (r.selectionKey ?? r.id) === selectedRouteId;
             const remaining = Math.max(0, r.capacity - (r.bookedSeats ?? 0));
             return (
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => setSelectedRouteId(r.id)}
+                onPress={() => setSelectedRouteId(r.selectionKey ?? r.id)}
                 style={[styles.routeCard, active && styles.routeCardActive]}
               >
                 <View style={styles.routeTop}>

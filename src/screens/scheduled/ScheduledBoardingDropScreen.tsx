@@ -67,7 +67,7 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
     let cancelled = false;
     setLoading(true);
     routeService
-      .getById(scheduledRoute.id)
+      .getById(scheduledRoute.id, scheduledRoute.direction)
       .then((r) => {
         if (cancelled) return;
         setRouteDoc(r);
@@ -83,7 +83,7 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
     };
     // refreshKey: the payment screen sends a new one when the server reports
     // the route's fares changed, so the new fare is loaded before rebooking.
-  }, [scheduledRoute.id, route.params?.refreshKey]);
+  }, [scheduledRoute.id, scheduledRoute.direction, route.params?.refreshKey]);
 
   // Pick the next-upcoming departure slot. We surface both the index
   // (needed by the booking endpoints to identify which slot the rider
@@ -97,7 +97,6 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
   } => {
     const today = new Date();
     const todayStr = istDateStr(today);
-    const tomorrow = istDateStr(new Date(today.getTime() + 24 * 60 * 60 * 1000));
 
     const departures = routeDoc?.schedule?.departures ?? [];
     if (departures.length === 0) {
@@ -110,29 +109,28 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
     }
 
     // Keep the original index when sorting so we can return it.
-    const indexed = departures.map((d, i) => ({ ...d, originalIndex: i }));
+    const indexed = departures.map((d, i) => ({ ...d, originalIndex: i })).filter(d => (d.direction ?? 'outbound') === (scheduledRoute.direction ?? 'outbound'));
+    if (!indexed.length) return { index: 0, time: '', date: todayStr, label: 'No published departures' };
     const sorted = [...indexed].sort((a, b) => a.time.localeCompare(b.time));
     const nowMin = istMinutesOfDay(today);
-    const upcoming = sorted.find((d) => {
-      const [h, m] = d.time.split(':').map(Number);
-      return h * 60 + m > nowMin;
-    });
-    if (upcoming) {
-      return {
-        index: upcoming.originalIndex,
-        time: upcoming.time,
-        date: todayStr,
-        label: fmt12h(upcoming.time),
-      };
+    const cutoff = routeDoc?.schedule?.bookingCutoffMinutes ?? BOOKING_CUTOFF_MIN;
+    const days = routeDoc?.schedule?.daysOfWeek ?? [];
+    const lastBookingDate = istDateStr(new Date(today.getTime() + (routeDoc?.schedule?.maxAdvanceBookingDays ?? 14) * 86400000));
+    const operates = (date: string) => !days.length || days.includes(new Date(`${date}T12:00:00Z`).getUTCDay());
+    const isOpen = (date: string, slot: typeof sorted[number]) => date <= lastBookingDate && operates(date) &&
+      (date > todayStr || (date === todayStr && Number(slot.time.slice(0, 2)) * 60 + Number(slot.time.slice(3)) > nowMin + cutoff));
+    // Keep the very trip whose date, time and seats the route card displayed.
+    const advertised = sorted.find(d => d.originalIndex === scheduledRoute.nextDepartureIndex);
+    const advertisedDate = scheduledRoute.nextDepartureDate;
+    if (advertised && advertisedDate && isOpen(advertisedDate, advertised))
+      return { index: advertised.originalIndex, time: advertised.time, date: advertisedDate, label: fmt12h(advertised.time) };
+    for (let offset = 0; offset <= (routeDoc?.schedule?.maxAdvanceBookingDays ?? 14); offset++) {
+      const date = istDateStr(new Date(today.getTime() + offset * 86400000));
+      const slot = sorted.find(d => isOpen(date, d));
+      if (slot) return { index: slot.originalIndex, time: slot.time, date, label: fmt12h(slot.time) };
     }
-    // All of today's slots have passed — book against tomorrow's first.
-    return {
-      index: sorted[0].originalIndex,
-      time: sorted[0].time,
-      date: tomorrow,
-      label: fmt12h(sorted[0].time),
-    };
-  }, [routeDoc, scheduledRoute.nextDeparture]);
+    return { index: -1, time: '', date: todayStr, label: 'No published departures' };
+  }, [routeDoc, scheduledRoute.nextDeparture, scheduledRoute.direction, scheduledRoute.nextDepartureDate, scheduledRoute.nextDepartureIndex]);
 
   // ── Travel date + departure-slot selection ──
   // Previously the date was forced to today/tomorrow and the slot auto-picked.
@@ -140,9 +138,10 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
   const sortedDepartures = useMemo(
     () =>
       (routeDoc?.schedule?.departures ?? [])
-        .map((d, i) => ({ time: d.time, index: i }))
+        .map((d, i) => ({ time: d.time, index: i, direction: d.direction ?? 'outbound' }))
+        .filter(d => d.direction === (scheduledRoute.direction ?? 'outbound'))
         .sort((a, b) => a.time.localeCompare(b.time)),
-    [routeDoc],
+    [routeDoc, scheduledRoute.direction],
   );
 
   // Live clock. Previously today/now were memoized once at mount, so a rider
@@ -159,13 +158,13 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
     }, []),
   );
 
-  // 14-day chip strip anchored to IST civil dates: chip i is the IST date of
+  // Booking-horizon chip strip anchored to IST civil dates: chip i is the IST date of
   // (now + i days). Labels derive from that same IST value — the previous
   // version mixed DEVICE-local midnight with IST conversions, so a non-IST
   // device could label the wrong civil date as "Today".
   const dateOptions = useMemo(() => {
     const out: { date: string; label: string }[] = [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i <= (routeDoc?.schedule?.maxAdvanceBookingDays ?? 14); i++) {
       const date = istDateStr(new Date(now.getTime() + i * 86400000));
       let label: string;
       if (i === 0) {
@@ -182,10 +181,11 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
           timeZone: 'UTC',
         });
       }
-      out.push({ date, label });
+      const days = routeDoc?.schedule?.daysOfWeek ?? [];
+      if (!days.length || days.includes(new Date(`${date}T12:00:00Z`).getUTCDay())) out.push({ date, label });
     }
     return out;
-  }, [now]);
+  }, [now, routeDoc]);
 
   const [selectedDate, setSelectedDate] = useState(departureMeta.date);
   const [selectedIndex, setSelectedIndex] = useState(departureMeta.index);
@@ -198,7 +198,7 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
   const bookingCutoffMin =
     routeDoc?.schedule?.bookingCutoffMinutes ?? BOOKING_CUTOFF_MIN;
 
-  // Cross-midnight orphan chip: the 14-day strip rebuilds off the live clock,
+  // Cross-midnight orphan chip: the date strip rebuilds off the live clock,
   // so past IST midnight the previously selected chip becomes "yesterday" and
   // vanishes from the strip — leaving a selection no chip represents. Snap
   // back to the first chip (today). YYYY-MM-DD compares lexicographically.
@@ -211,11 +211,14 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
   const availableSlots = useMemo(
     () =>
       sortedDepartures.filter((s) => {
+        if (selectedDate > istDateStr(new Date(now.getTime() + (routeDoc?.schedule?.maxAdvanceBookingDays ?? 14) * 86400000))) return false;
+        const days = routeDoc?.schedule?.daysOfWeek ?? [];
+        if (days.length && !days.includes(new Date(`${selectedDate}T12:00:00Z`).getUTCDay())) return false;
         if (selectedDate !== todayStr) return true;
         const [h, m] = s.time.split(':').map(Number);
         return h * 60 + m > nowMin + bookingCutoffMin;
       }),
-    [sortedDepartures, selectedDate, todayStr, nowMin, bookingCutoffMin],
+    [sortedDepartures, selectedDate, todayStr, nowMin, bookingCutoffMin, routeDoc, now],
   );
 
   // Keep the selected slot valid whenever the available set changes. When the
@@ -226,6 +229,13 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
   const slotSeededRef = useRef(false);
   const [slotMovedNotice, setSlotMovedNotice] = useState<string | null>(null);
   useEffect(() => {
+    if (!routeDoc) return;
+    if (!slotSeededRef.current) {
+      slotSeededRef.current = true;
+      setSelectedDate(departureMeta.date);
+      setSelectedIndex(departureMeta.index);
+      return;
+    }
     if (availableSlots.length === 0) return;
     if (!availableSlots.some((s) => s.index === selectedIndex)) {
       const next = availableSlots[0];
@@ -237,7 +247,7 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
       }
     }
     slotSeededRef.current = true;
-  }, [availableSlots, selectedIndex]);
+  }, [availableSlots, selectedIndex, routeDoc, departureMeta]);
 
   // The notice is transient — fade it out after a few seconds.
   useEffect(() => {
@@ -264,17 +274,15 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
   }, [routeDoc, departureTime]);
 
   const boardingOptions = useMemo(
-    // Every stop except the last (no boarding at destination).
-    () => allStops.slice(0, Math.max(0, allStops.length - 1)),
-    [allStops],
+    // A slot may begin at an intermediate stop, including on the return leg.
+    () => allStops.slice(routeDoc?.schedule?.departures?.[selectedIndex]?.stopIndex ?? 0, Math.max(0, allStops.length - 1)),
+    [allStops, routeDoc, selectedIndex],
   );
 
   // Default boarding = the route's first stop. Once stops are loaded we
   // seed the selection so the Confirm button can be hit immediately.
   useEffect(() => {
-    if (!boardingId && boardingOptions.length > 0) {
-      setBoardingId(boardingOptions[0].id);
-    }
+    if (!boardingOptions.some(stop => stop.id === boardingId)) setBoardingId(boardingOptions[0]?.id ?? null);
   }, [boardingOptions, boardingId]);
 
   const selectedBoarding = useMemo(
@@ -305,7 +313,7 @@ export const ScheduledBoardingDropScreen: React.FC<Props> = ({ navigation, route
   const handleConfirm = () => {
     const boarding = allStops.find((p) => p.id === boardingId);
     const dropping = allStops.find((p) => p.id === droppingId);
-    if (!boarding || !dropping) return;
+    if (!boarding || !dropping || !boardingOptions.some(stop => stop.id === boarding.id)) return;
     if (availableSlots.length === 0) {
       Alert.alert('Pick a date', 'No departures remain for the selected date. Please choose another date.');
       return;

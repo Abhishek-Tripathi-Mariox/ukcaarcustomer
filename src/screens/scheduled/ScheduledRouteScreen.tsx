@@ -1,3 +1,4 @@
+import { scheduledRouteDuration } from '@/utils/scheduledRouteDuration';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -29,12 +30,17 @@ interface ScheduledRouteScreenProps {
  */
 export interface ScheduledRoute {
   id: string;
+  selectionKey?: string;
+  direction?: 'outbound' | 'return';
   name: string;
   from: string;
   to: string;
   capacity: number;
+  availableSeats?: number;
   price: number;
   nextDeparture: string;
+  nextDepartureDate?: string | null;
+  nextDepartureIndex?: number | null;
   approvedDriverCount: number;
   returnDepartures?: { stopIndex: number; time: string }[];
   hasRoundTripDriver: boolean;
@@ -44,10 +50,7 @@ export interface ScheduledRoute {
    *  route starts from before they tap into the seats screen. */
   nearestPickupStopName?: string | null;
   nearestPickupStopKm?: number | null;
-  /** Estimated trip length in minutes — computed client-side from the
-   *  stop polyline (Haversine total ÷ assumed 35 km/h cruise) because
-   *  the Route model doesn't store this. Surfaced on the Select Route
-   *  card's Duration column. */
+  /** Admin-defined minimum duration, with a polyline estimate for legacy routes. */
   durationMin: number;
   /** Booked seats on the next-upcoming trip. Available = capacity − this. */
   bookedSeats: number;
@@ -105,35 +108,6 @@ const nextDepartureLabel = (r: ScheduledRouteApi): string => {
   return `${timeLabel} (${dayLabel})`;
 };
 
-// Approximate cruise speed for a shuttle on Indian roads. Used to
-// translate the stop-polyline distance into a "Duration" the rider can
-// trust without a real routing engine round-trip.
-const SHUTTLE_KMH = 35;
-
-const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }): number => {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const lat1 = (a.lat * Math.PI) / 180;
-  const lat2 = (b.lat * Math.PI) / 180;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
-  return 2 * R * Math.asin(Math.sqrt(h));
-};
-
-const computeDurationMin = (r: ScheduledRouteApi): number => {
-  const stops = [...(r.stops ?? [])].sort(
-    (a, b) => (a.sequence ?? 0) - (b.sequence ?? 0),
-  );
-  if (stops.length < 2) return 0;
-  let totalKm = 0;
-  for (let i = 1; i < stops.length; i += 1) {
-    totalKm += haversineKm(stops[i - 1], stops[i]);
-  }
-  return Math.max(1, Math.round((totalKm / SHUTTLE_KMH) * 60));
-};
-
 // Exported so HomeScreen can render the same route cards inline without
 // duplicating the API → UI mapping logic.
 export const routeToUi = (r: ScheduledRouteApi): ScheduledRoute => {
@@ -142,14 +116,19 @@ export const routeToUi = (r: ScheduledRouteApi): ScheduledRoute => {
   const meters = r.nearestPickupStopMeters;
   return {
     id: r._id,
+    selectionKey: `${r._id}_${r.direction ?? 'outbound'}`,
+    direction: r.direction ?? 'outbound',
     name: r.name,
     from: first?.name ?? '—',
     to: last?.name ?? '—',
-    capacity: r.schedule?.totalSeats ?? 0,
+    capacity: r.nextDepartureCapacity ?? 0,
+    availableSeats: r.nextDepartureAvailableSeats,
     price: r.schedule?.seatPrice ?? 0,
-    durationMin: computeDurationMin(r),
+    durationMin: r.schedule?.minimumJourneyMinutes ?? scheduledRouteDuration(r.stops ?? []),
     bookedSeats: r.nextDepartureBookedSeats ?? 0,
     nextDeparture: nextDepartureLabel(r),
+    nextDepartureDate: r.nextDepartureDate,
+    nextDepartureIndex: r.nextDepartureIndex,
     bookingCutoffMinutes: r.schedule?.bookingCutoffMinutes,
     approvedDriverCount: r.approvedDriverCount ?? 0,
     returnDepartures: r.schedule?.returnDepartures,
@@ -199,7 +178,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
           if (cancelled) return;
           const ui = apiRoutes.map(routeToUi);
           setRoutes(ui);
-          if (ui.length > 0) setSelectedId(ui[0].id);
+          if (ui.length > 0) setSelectedId(ui[0].selectionKey ?? ui[0].id);
         })
         .catch((err) => {
           if (cancelled) return;
@@ -213,7 +192,7 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
     };
   }, [pickup, dropoff]);
 
-  const selected = routes?.find((r) => r.id === selectedId) ?? null;
+  const selected = routes?.find((r) => (r.selectionKey ?? r.id) === selectedId) ?? null;
 
   const handleSelectSeats = () => {
     if (!selected) return;
@@ -291,20 +270,20 @@ export const ScheduledRouteScreen: React.FC<ScheduledRouteScreenProps> = ({ navi
           </View>
         )}
         {routes?.map((r) => {
-          const isActive = r.id === selectedId;
+          const isActive = (r.selectionKey ?? r.id) === selectedId;
           // Duration is computed in routeToUi from the stop polyline
           // (Haversine total \u00f7 assumed 35 km/h cruise) \u2014 gives the rider
           // a realistic trip length without a routing-engine round-trip.
           const durationLabel = r.durationMin > 0 ? `${r.durationMin}min` : '\u2014';
           // Available = remaining seats on the next trip. Falls back to
           // capacity when no bookings exist yet.
-          const remaining = Math.max(0, r.capacity - (r.bookedSeats ?? 0));
+          const remaining = r.availableSeats ?? Math.max(0, r.capacity - (r.bookedSeats ?? 0));
           const availableLabel = r.capacity ? `${remaining}/${r.capacity}` : '\u2014';
           return (
             <TouchableOpacity
-              key={r.id}
+              key={r.selectionKey ?? r.id}
               activeOpacity={0.9}
-              onPress={() => setSelectedId(r.id)}
+              onPress={() => setSelectedId(r.selectionKey ?? r.id)}
               style={[styles.routeCard, isActive && styles.routeCardActive]}
             >
               <Text style={styles.routeName} numberOfLines={1}>

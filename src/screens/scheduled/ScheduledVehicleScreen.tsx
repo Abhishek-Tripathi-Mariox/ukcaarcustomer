@@ -1,3 +1,4 @@
+import { scheduledRouteDuration } from '@/utils/scheduledRouteDuration';
 import React, { useEffect, useState } from 'react';
 import { driverRatingText } from '@/utils/driverRating';
 import {
@@ -8,15 +9,17 @@ import {
   ScrollView,
   StatusBar,
   ActivityIndicator,
+  AppState,
+  RefreshControl,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadow, alpha } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
 import type { ScheduledRoute } from './ScheduledRouteScreen';
-import { routeService, type RouteVehicle } from '@/services/routeService';
+import { routeService, type RouteVehicle, type ScheduledAlternative } from '@/services/routeService';
 
-interface Stop { id: string; name: string; time: string }
+interface Stop { id: string; name: string; time: string; sequence: number }
 
 interface Props {
   navigation: any;
@@ -31,6 +34,7 @@ interface Props {
       // the previous screen from the stops' fareFromPrevious; falls back to
       // the flat seat price when no segment fares are configured).
       unitFare: number;
+      seatsNeeded?: number;
     };
   };
 }
@@ -49,40 +53,74 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
     route.params;
 
   const [vehicles, setVehicles] = useState<RouteVehicle[] | null>(null);
-  const [routeCapacity, setRouteCapacity] = useState(0);
   const [error, setError] = useState<string | null>(null);
   // Server explanation for a date/slot that cannot be booked (past date,
   // closed departure, non-operating day). When set, the empty state renders
   // THIS instead of the generic "check back closer to departure" copy —
   // which is actively wrong for a closed date.
   const [closedMessage, setClosedMessage] = useState<string | null>(null);
-  const [seatsNeeded, setSeatsNeeded] = useState(1);
+  const [seatsNeeded, setSeatsNeeded] = useState(route.params.seatsNeeded ?? 1);
+  const [refreshing, setRefreshing] = useState(false);
+  const [alternatives, setAlternatives] = useState<ScheduledAlternative[]>([]);
+  const [alternativesLoading, setAlternativesLoading] = useState(false);
+  const [alternativesError, setAlternativesError] = useState<string | null>(null);
+  const [retryAlternatives, setRetryAlternatives] = useState(0);
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
-    setVehicles(null);
-    setClosedMessage(null);
-    routeService
-      .listVehicles(scheduledRoute.id, { date: departureDate, departureIndex })
-      .then((res) => {
-        if (cancelled) return;
-        setVehicles(res.vehicles);
-        setRouteCapacity(res.totalSeats || 0);
-        setClosedMessage(res.message ?? null);
-      })
-      .catch((err: any) => {
-        if (cancelled) return;
-        setError(
-          err?.response?.data?.message || err?.message || 'Could not load vehicles',
-        );
-        setVehicles([]);
-      });
-    return () => {
-      cancelled = true;
+    let requestId = 0;
+    const load = async () => {
+      if (navigation.isFocused && !navigation.isFocused()) return;
+      const generation = ++requestId;
+      setRefreshing(true);
+      try {
+        const res = await routeService.listVehicles(scheduledRoute.id, { date: departureDate, departureIndex });
+        if (cancelled || generation !== requestId) return;
+        setVehicles(res.vehicles); setClosedMessage(res.message ?? null); setError(null);
+      } catch (err: any) {
+        if (cancelled || generation !== requestId) return;
+        setError(err?.response?.data?.message || err?.message || 'Could not load vehicles');
+        setVehicles([]); setSelectedDriverId(null); setClosedMessage(null);
+      } finally { if (!cancelled && generation === requestId) setRefreshing(false); }
     };
-  }, [scheduledRoute.id, departureDate, departureIndex]);
+    setVehicles(null); setSelectedDriverId(null); load();
+    const timer = setInterval(load, 15000);
+    const focus = navigation.addListener?.('focus', load);
+    const appState = AppState.addEventListener('change', state => { if (state === 'active') load(); });
+    return () => { cancelled = true; clearInterval(timer); focus?.(); appState.remove(); };
+  }, [scheduledRoute.id, departureDate, departureIndex, navigation, retryAlternatives]);
+
+  const noSuitableVehicle = vehicles !== null && !error && !closedMessage && !vehicles.some(vehicle => vehicle.available >= seatsNeeded && vehicle.available > 0);
+  useEffect(() => {
+    let cancelled = false;
+    if (!noSuitableVehicle && !closedMessage) { setAlternatives([]); setAlternativesError(null); setAlternativesLoading(false); return; }
+    setAlternativesLoading(true); setAlternatives([]); setAlternativesError(null);
+    routeService.listAlternatives(scheduledRoute.id, { date: departureDate, departureIndex,
+      boardingStopSequence: boarding.sequence, droppingStopSequence: dropping.sequence, seats: seatsNeeded, days: 7,
+    }).then(result => { if (!cancelled) setAlternatives(result); })
+      .catch((err: any) => { if (!cancelled) setAlternativesError(err?.response?.data?.message || 'Could not load alternatives.'); })
+      .finally(() => { if (!cancelled) setAlternativesLoading(false); });
+    return () => { cancelled = true; };
+  }, [noSuitableVehicle, closedMessage, scheduledRoute.id, departureDate, departureIndex, boarding.sequence, dropping.sequence, seatsNeeded, retryAlternatives, vehicles]);
+
+  const chooseAlternative = (alternative: ScheduledAlternative) => {
+    const segmentFare = alternative.route.stops.filter(stop => stop.sequence > alternative.boarding.sequence && stop.sequence <= alternative.dropping.sequence).reduce((sum, stop) => sum + (stop.fareFromPrevious ?? 0), 0);
+    const nextRoute: ScheduledRoute = { ...scheduledRoute, id: alternative.route._id, name: alternative.route.name,
+      direction: alternative.route.direction ?? 'outbound', selectionKey: `${alternative.route._id}_${alternative.route.direction ?? 'outbound'}`,
+      from: alternative.route.stops[0]?.name ?? '', to: alternative.route.stops[alternative.route.stops.length - 1]?.name ?? '',
+      durationMin: alternative.route.schedule?.minimumJourneyMinutes ?? scheduledRouteDuration(alternative.route.stops),
+      nearestPickupStopName: alternative.boarding.name, nearestPickupStopKm: null,
+      price: alternative.route.schedule?.seatPrice ?? 0, capacity: alternative.availableSeats, availableSeats: alternative.availableSeats,
+      bookingCutoffMinutes: alternative.route.schedule?.bookingCutoffMinutes, bookedSeats: 0, nextDeparture: alternative.departureTime,
+      approvedDriverCount: alternative.vehicleCount, hasRoundTripDriver: false, returnDepartures: alternative.route.schedule?.returnDepartures,
+    };
+    navigation.push('ScheduledVehicle', { route: nextRoute, departureDate: alternative.departureDate, departureIndex: alternative.departureIndex,
+      boarding: { id: String(alternative.boarding.sequence), name: alternative.boarding.name, sequence: alternative.boarding.sequence, time: alternative.departureTime },
+      dropping: { id: String(alternative.dropping.sequence), name: alternative.dropping.name, sequence: alternative.dropping.sequence, time: alternative.departureTime },
+      seatsNeeded, unitFare: segmentFare > 0 ? segmentFare : nextRoute.price,
+    });
+  };
 
   // A vehicle is selectable only if it can seat the whole request.
   const isSelectable = (v: RouteVehicle) => v.available >= seatsNeeded && v.available > 0;
@@ -91,20 +129,16 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
   useEffect(() => {
     if (!selectedDriverId) return;
     const sel = vehicles?.find((v) => v.driverId === selectedDriverId);
-    if (sel && !isSelectable(sel)) setSelectedDriverId(null);
+    if (!sel || !isSelectable(sel)) setSelectedDriverId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seatsNeeded, vehicles]);
 
-  // Stepper upper bound = the route's seat capacity (returned by the API
-  // even when no vehicles are loaded yet). The rider may request up to a
-  // full vehicle; vehicles with fewer free seats than the request are then
-  // greyed out below.
-  const maxSeats = Math.max(1, routeCapacity);
+  const maxSeats = Math.max(seatsNeeded, 1, ...(vehicles ?? []).map(vehicle => vehicle.capacity), ...alternatives.map(alternative => alternative.availableSeats));
 
   const selectedVehicle = vehicles?.find((v) => v.driverId === selectedDriverId) ?? null;
 
   const handleContinue = () => {
-    if (!selectedVehicle) return;
+    if (!selectedVehicle || !isSelectable(selectedVehicle) || refreshing || closedMessage || error) return;
     navigation.navigate('ScheduledSeat', {
       route: scheduledRoute,
       boarding,
@@ -153,6 +187,7 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
           <Text style={[styles.driverName, !selectable && styles.mutedText]} numberOfLines={1}>
             {v.driverName}
             {v.vehicle.plateNumber ? `  •  ${v.vehicle.plateNumber}` : ''}
+            {v.vehicle.typeCode ? `  •  ${v.vehicle.typeCode}` : ''}
           </Text>
           <View style={styles.metaRow}>
             <Ionicons name="star" size={12} color={selectable ? '#F5A623' : '#C4C4C4'} />
@@ -202,11 +237,11 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
           <ActivityIndicator color={Colors.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => setRetryAlternatives(value => value + 1)} />}>
           <View style={styles.routeBanner}>
             <Text style={styles.routeBannerTitle} numberOfLines={2}>{scheduledRoute.name}</Text>
             <Text style={styles.routeBannerSub} numberOfLines={2}>
-              {boarding.name} → {dropping.name}
+              {boarding.name} → {dropping.name} · {departureDate}{boarding.time ? ` · ${boarding.time} IST` : ''}
             </Text>
           </View>
 
@@ -244,20 +279,36 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
           {vehicles.length === 0 && !error && (
             <Text style={styles.helperText}>
               {closedMessage ??
-                'No vehicles are available for this departure yet. Try another route or check back closer to departure time.'}
+                'No vehicles are available for this departure yet. Choose an alternative below.'}
             </Text>
           )}
 
           {vehicles.map(renderVehicle)}
+          {(noSuitableVehicle || closedMessage) && <View style={styles.routeBanner}>
+            <Text style={styles.sectionTitle}>Alternative departures</Text>
+            <Text style={styles.stepperHint}>Same date first, then the next 7 days. All times are IST.</Text>
+            {alternativesLoading && <ActivityIndicator color={Colors.primary} />}
+            {alternativesError && <><Text style={styles.helperText}>{alternativesError}</Text><TouchableOpacity onPress={() => setRetryAlternatives(value => value + 1)}><Text style={styles.okText}>Retry alternatives</Text></TouchableOpacity></>}
+            {!alternativesLoading && !alternativesError && alternatives.length === 0 && <Text style={styles.helperText}>No matching departures have enough seats in this period. Try another travel date.</Text>}
+            {alternatives.map(alternative => <TouchableOpacity key={alternative.route._id + alternative.departureDate + alternative.departureIndex} onPress={() => chooseAlternative(alternative)} style={[styles.card, { marginTop: 12 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.vehicleName}>{alternative.route.name}</Text>
+                <Text style={styles.driverName}>{alternative.departureDate} · {alternative.departureTime} IST</Text>
+                <Text style={styles.driverName}>{alternative.boarding.name} → {alternative.dropping.name}</Text>
+                <Text style={styles.okText}>{alternative.availableSeats} seats free in one vehicle · Choose departure</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
+            </TouchableOpacity>)}
+          </View>}
         </ScrollView>
       )}
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity
-          style={[styles.cta, !selectedVehicle && { opacity: 0.5 }]}
+          style={[styles.cta, (!selectedVehicle || refreshing || !!closedMessage || !!error) && { opacity: 0.5 }]}
           onPress={handleContinue}
           activeOpacity={0.85}
-          disabled={!selectedVehicle}
+          disabled={!selectedVehicle || refreshing || !!closedMessage || !!error}
         >
           <Text style={styles.ctaText}>
             {selectedVehicle ? `Continue (${seatsNeeded} seat${seatsNeeded === 1 ? '' : 's'})` : 'Select a vehicle'}

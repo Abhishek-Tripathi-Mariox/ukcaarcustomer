@@ -10,6 +10,7 @@ export interface RouteStop {
 }
 
 export interface RouteDeparture {
+  direction?: 'outbound' | 'return';
   stopIndex: number;
   /** HH:mm 24h. */
   time: string;
@@ -31,12 +32,14 @@ export interface RouteSchedule {
   maxAdvanceBookingDays?: number;
   startWindowMinutes?: number;
   minRestMinutes?: number;
+  minimumJourneyMinutes?: number;
+  turnaroundMinutes?: number;
   cancellationCutoffMinutes?: number;
 }
 
 /** One driver's vehicle serving a route+departure, with its own seat
  *  availability. Each approved driver runs a shuttle of `capacity`
- *  (= route totalSeats) seats; `available` = capacity − booked. */
+ *  from their vehicle registration; `available` = capacity − booked. */
 export interface RouteVehicle {
   driverId: string;
   driverName: string;
@@ -56,6 +59,7 @@ export interface RouteVehicle {
 }
 
 export interface ScheduledRouteApi {
+  direction?: 'outbound' | 'return';
   _id: string;
   name: string;
   description?: string;
@@ -78,6 +82,19 @@ export interface ScheduledRouteApi {
   nextDepartureDate?: string | null;
   nextDepartureIndex?: number | null;
   nextDepartureBookedSeats?: number;
+  nextDepartureCapacity?: number;
+  nextDepartureAvailableSeats?: number;
+}
+
+export interface ScheduledAlternative {
+  route: ScheduledRouteApi;
+  departureDate: string;
+  departureIndex: number;
+  departureTime: string;
+  boarding: RouteStop;
+  dropping: RouteStop;
+  availableSeats: number;
+  vehicleCount: number;
 }
 
 /**
@@ -86,6 +103,10 @@ export interface ScheduledRouteApi {
  * showing a route to the customer that no driver actually operates.
  */
 export const routeService = {
+  listAlternatives: async (routeId: string, params: { date: string; departureIndex: number; boardingStopSequence: number; droppingStopSequence: number; seats: number; days: number }): Promise<ScheduledAlternative[]> => {
+    const { data } = await api.get<{ data: { alternatives: ScheduledAlternative[] } }>(`/routes/${routeId}/alternatives`, { params });
+    return data?.data?.alternatives ?? [];
+  },
   listScheduled: async (
     opts: {
       hasApprovedDriver?: boolean;
@@ -121,11 +142,11 @@ export const routeService = {
     return data?.data?.routes ?? [];
   },
 
-  getById: async (id: string): Promise<ScheduledRouteApi> => {
+  getById: async (id: string, direction?: 'outbound' | 'return'): Promise<ScheduledRouteApi> => {
     const { data } = await api.get<{
       success: boolean;
       data: { route: ScheduledRouteApi };
-    }>(`/routes/${id}`);
+    }>(`/routes/${id}`, { params: { direction } });
     return data.data.route;
   },
 

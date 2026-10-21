@@ -3,7 +3,6 @@ import { driverRatingText } from '@/utils/driverRating';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '@/theme';
 import { fs, s, vs } from '@/theme/responsive';
-import { useAppSelector } from '@/store/hooks';
 import { getPreviousTab } from '@/navigation/tabHistory';
 import {
   View,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  AppState,
   RefreshControl,
   Alert,
 } from 'react-native';
@@ -21,6 +21,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { rideService, Ride } from '@/services/rideService';
 import { routeService } from '@/services/routeService';
 import { RatingSheet } from '@/components/RatingSheet';
+import { isScheduledRide, isMissedScheduledRide, scheduledHistoryGroup } from '@/utils/scheduledRideHistory';
 
 type TabKey = 'active' | 'completed' | 'cancelled' | 'scheduled';
 
@@ -102,7 +103,10 @@ const getStatusBadge = (status: Ride['status'], tab: TabKey) => {
 export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('active');
+  const [scheduledTab, setScheduledTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [now, setNow] = useState(() => Date.now());
   const [rides, setRides] = useState<Ride[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   // Trip-rating sheet for completed rides.
@@ -126,10 +130,13 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
     try {
       const data = await rideService.getRides(1, 50);
       setRides(data?.rides || data?.items || []);
+      setLoadFailed(false);
+      setNow(Date.now());
       const pg = data?.pagination;
       setPageInfo({ page: pg?.page ?? 1, pages: pg?.pages ?? 1 });
     } catch (err) {
-      setRides([]);
+      // A failed refresh must not erase tickets already loaded.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -165,8 +172,16 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
   const hasLoadedRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
+      let alive = true;
       loadRides(!hasLoadedRef.current);
       hasLoadedRef.current = true;
+      const clock = setInterval(() => {
+        if (AppState.currentState === 'active') setNow(Date.now());
+      }, 1_000);
+      const subscription = AppState.addEventListener('change', state => {
+        if (alive && state === 'active') { setNow(Date.now()); loadRides(false); }
+      });
+      return () => { alive = false; clearInterval(clock); subscription.remove(); };
     }, [loadRides]),
   );
 
@@ -177,14 +192,13 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
 
   const filteredRides = useMemo(() => {
     return rides.filter((r) => {
-      const isScheduled = (r as any).isScheduled === true || r.rideType === 'scheduled';
+      const isScheduled = isScheduledRide(r);
       // A scheduled booking whose shuttle is running RIGHT NOW (driver's journey
       // active/in_progress, or the rider has boarded). The backend sets this on
       // the projected row so the live one can surface in Active + be tracked.
       const isActiveNow = (r as any).isActiveNow === true;
       // Active tab = live instant/private rides AND live scheduled shuttles.
-      // Scheduled tab keeps everything scheduled that ISN'T live right now
-      // (upcoming, completed, cancelled) so a ticket is always findable there.
+      // Scheduled keeps every ticket accessible, including running shuttles.
       switch (activeTab) {
         case 'active':
           return isScheduled
@@ -195,12 +209,12 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
         case 'cancelled':
           return !isScheduled && r.status === 'cancelled';
         case 'scheduled':
-          return isScheduled && !isActiveNow;
+          return isScheduled && scheduledHistoryGroup(r, now) === scheduledTab;
         default:
           return false;
       }
     });
-  }, [rides, activeTab]);
+  }, [rides, activeTab, scheduledTab, now]);
 
   const handleCancelScheduled = (ride: Ride) => {
     // Scheduled bookings are cancelled via the routes booking endpoint, not
@@ -364,7 +378,11 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
 
   const renderRideCard = (ride: Ride) => {
     const chip = getRideTypeChip(ride.rideType);
-    const badge = getStatusBadge(ride.status, activeTab);
+    const badge = isMissedScheduledRide(ride, now)
+      ? { bg: '#FFF7ED', fg: '#C2410C', dot: '#C2410C', label: 'Missed' }
+      : (ride as any).isActiveNow === true
+        ? { bg: '#ECFDF5', fg: '#059669', dot: '#059669', label: 'Ongoing' }
+        : getStatusBadge(ride.status, activeTab);
 
     // Cancelled-ride money line. This used to read
     //   refunded = actualFare || estimatedFare
@@ -395,7 +413,7 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
       cancelledBy === 'driver'
         ? 'Cancelled by driver'
         : cancelledBy === 'system'
-        ? 'No driver found'
+        ? (isScheduledRow ? 'Trip did not run' : 'No driver found')
         : cancelledBy === 'admin'
         ? 'Cancelled by support'
         : 'Cancelled';
@@ -487,7 +505,7 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
             >
               <Text style={[styles.actionText, { color: '#219EBC' }]}>View Details</Text>
             </TouchableOpacity>
-            {ride.status !== 'completed' && ride.status !== 'cancelled' && (
+            {scheduledHistoryGroup(ride, now) === 'upcoming' && !(ride as any).isActiveNow && (
               <TouchableOpacity
                 style={[styles.actionBtn, { borderColor: '#EF4444', flexDirection: 'row' }]}
                 activeOpacity={0.8}
@@ -541,7 +559,7 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
       <View style={styles.emptyIcon}>
         <Ionicons name="car-outline" size={40} color="#0097B3" />
       </View>
-      <Text style={styles.emptyTitle}>No {activeTab} rides</Text>
+      <Text style={styles.emptyTitle}>No {activeTab === 'scheduled' ? `${scheduledTab} scheduled` : activeTab} rides</Text>
       <Text style={styles.emptyDesc}>
         {activeTab === 'active'
           ? 'You have no ongoing rides right now.'
@@ -602,6 +620,24 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
         </ScrollView>
       </View>
 
+      {activeTab === 'scheduled' && (
+        <View style={styles.scheduledTabs}>
+          {(['upcoming', 'past'] as const).map(value => (
+            <TouchableOpacity
+              key={value}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: scheduledTab === value }}
+              style={[styles.tabBtn, scheduledTab === value ? styles.tabBtnActive : styles.tabBtnInactive]}
+              onPress={() => setScheduledTab(value)}
+            >
+              <Text style={[styles.tabText, scheduledTab === value ? styles.tabTextActive : styles.tabTextInactive]}>
+                {value === 'upcoming' ? 'Upcoming' : 'Past'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -624,11 +660,16 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
             />
           }
         >
+          {loadFailed && (
+            <TouchableOpacity onPress={onRefresh} style={styles.loadMoreBtn}>
+              <Text style={styles.loadMoreText}>Could not refresh rides. Tap to retry.</Text>
+            </TouchableOpacity>
+          )}
           {filteredRides.length === 0 ? renderEmpty() : filteredRides.map(renderRideCard)}
 
           {/* Older history lives on later pages — page 1 used to be all
               anyone could ever see. */}
-          {pageInfo.page < pageInfo.pages && filteredRides.length > 0 && (
+          {pageInfo.page < pageInfo.pages && (
             <TouchableOpacity
               style={styles.loadMoreBtn}
               onPress={loadMore}
@@ -663,6 +704,7 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
 };
 
 const styles = StyleSheet.create({
+  scheduledTabs: { flexDirection: 'row', gap: s(12), paddingHorizontal: s(16), paddingBottom: vs(12) },
   container: { flex: 1, backgroundColor: '#F8F9FB' },
   header: {
     backgroundColor: Colors.primary,

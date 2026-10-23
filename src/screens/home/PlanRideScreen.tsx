@@ -665,7 +665,9 @@ export const PlanRideScreen: React.FC<any> = ({ navigation, route }: PlanRideScr
           }
           renderItem={({ item: r }) => {
             const active = (r.selectionKey ?? r.id) === selectedRouteId;
-            const remaining = Math.max(0, r.capacity - (r.bookedSeats ?? 0));
+            // Server-computed free seats (per vehicle, legacy seats excluded);
+            // the subtraction is only for an older server without the field.
+            const remaining = r.availableSeats ?? Math.max(0, r.capacity - (r.bookedSeats ?? 0));
             return (
               <TouchableOpacity
                 activeOpacity={0.9}

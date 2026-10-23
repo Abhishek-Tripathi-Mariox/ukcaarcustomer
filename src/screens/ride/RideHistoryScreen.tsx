@@ -349,6 +349,8 @@ export const RideHistoryScreen: React.FC<RideHistoryScreenProps> = ({ navigation
       driverId: booking.driver ?? (ride.driver as any)?._id ?? undefined,
       rideId: ride._id,
       status: ride.status,
+      refundedAmount: Number(booking.refundedAmount ?? 0),
+      cancelledBy: (ride as any).cancellation?.cancelledBy,
     });
   };
 

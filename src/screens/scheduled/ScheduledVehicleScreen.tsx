@@ -92,6 +92,8 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
   }, [scheduledRoute.id, departureDate, departureIndex, navigation, retryAlternatives]);
 
   const noSuitableVehicle = vehicles !== null && !error && !closedMessage && !vehicles.some(vehicle => vehicle.available >= seatsNeeded && vehicle.available > 0);
+  // Keyed on the outcome, not the `vehicles` array: every 15 s poll returns a
+  // new array, which used to clear and refetch the list mid-tap.
   useEffect(() => {
     let cancelled = false;
     if (!noSuitableVehicle && !closedMessage) { setAlternatives([]); setAlternativesError(null); setAlternativesLoading(false); return; }
@@ -102,7 +104,7 @@ export const ScheduledVehicleScreen: React.FC<Props> = ({ navigation, route }) =
       .catch((err: any) => { if (!cancelled) setAlternativesError(err?.response?.data?.message || 'Could not load alternatives.'); })
       .finally(() => { if (!cancelled) setAlternativesLoading(false); });
     return () => { cancelled = true; };
-  }, [noSuitableVehicle, closedMessage, scheduledRoute.id, departureDate, departureIndex, boarding.sequence, dropping.sequence, seatsNeeded, retryAlternatives, vehicles]);
+  }, [noSuitableVehicle, closedMessage, scheduledRoute.id, departureDate, departureIndex, boarding.sequence, dropping.sequence, seatsNeeded, retryAlternatives]);
 
   const chooseAlternative = (alternative: ScheduledAlternative) => {
     const segmentFare = alternative.route.stops.filter(stop => stop.sequence > alternative.boarding.sequence && stop.sequence <= alternative.dropping.sequence).reduce((sum, stop) => sum + (stop.fareFromPrevious ?? 0), 0);

@@ -161,6 +161,11 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
     return departMs - Date.now() > bookingCutoffMin * 60 * 1000;
   };
 
+  // The trip's vehicle changed while booking (VEHICLE_CHANGED), so the chosen
+  // seats may not exist any more. Back to the vehicle list (always in the
+  // stack; it reloads on focus) to pick the vehicle and seats again.
+  const backToVehicles = () => navigation.navigate({ name: 'ScheduledVehicle', merge: true });
+
   const handlePay = async () => {
     if (paying) return;
     if (!isDepartureStillBookable()) {
@@ -281,6 +286,13 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
                   }),
               },
             ]);
+          } else if (bd?.code === 'VEHICLE_CHANGED') {
+            // Server refunded the wallet debit before answering.
+            Alert.alert(
+              'Vehicle Changed',
+              'The vehicle for this trip was updated while you were booking, so your seats need to be picked again. Nothing was taken from your wallet.',
+              [{ text: 'Choose again', onPress: backToVehicles }],
+            );
           } else if (bs === 409) {
             const conflicts: number[] = bd?.data?.conflicts ?? [];
             Alert.alert(
@@ -303,11 +315,29 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
       // ── 2. Pay via Razorpay Gateway (UPI, Cards, Google Pay, PhonePe, NetBanking) ──
       // Tagged as a seat-booking order: the server only accepts a
       // 'scheduled_booking' payment as proof of payment for seats.
-      const orderRes = await paymentService.createOrder({
-        amount: payable,
-        type: 'scheduled_booking',
-        scheduledRouteId: scheduledRoute.id,
-      });
+      // The trip identity lets the server refuse a departure the driver has
+      // blocked BEFORE the rider pays (otherwise /book refuses it afterwards
+      // and the refund is manual).
+      let orderRes;
+      try {
+        orderRes = await paymentService.createOrder({
+          amount: payable,
+          type: 'scheduled_booking',
+          scheduledRouteId: scheduledRoute.id,
+          driverId,
+          departureDate,
+          departureIndex,
+        });
+      } catch (orderErr: any) {
+        const od = orderErr?.response?.data;
+        if (orderErr?.response?.status === 422 && od?.message) {
+          Alert.alert('Vehicle unavailable', `${od.message} Nothing was charged.`, [
+            { text: 'Choose again', onPress: backToVehicles },
+          ]);
+          return;
+        }
+        throw orderErr;
+      }
 
       if (!orderRes.success) {
         Alert.alert('Error', 'Failed to initialize payment order with Razorpay.');
@@ -399,6 +429,12 @@ export const ScheduledPaymentScreen: React.FC<Props> = ({ navigation, route }) =
                   }),
               },
             ],
+          );
+        } else if (bd?.code === 'VEHICLE_CHANGED') {
+          Alert.alert(
+            'Vehicle Changed',
+            'The vehicle for this trip was updated while you were booking, so your seats need to be picked again. Your payment was received but not used for a booking — our support team will refund it.',
+            [{ text: 'Choose again', onPress: backToVehicles }],
           );
         } else if (bs === 409) {
           const conflicts: number[] = bd?.data?.conflicts ?? [];

@@ -75,11 +75,11 @@ type Stage =
 const CANCEL_CUTOFF_MIN = 60;
 
 /**
- * Mirrors the server's default startWindowMinutes — a journey may begin up
- * to this long after the scheduled time. Past it, with the booking still
- * reserved and no journey running, the trip is treated as missed.
+ * The server refuses a journey start from the departure instant onwards, so
+ * once departure has passed with the booking still reserved and no journey
+ * running, the trip is missed (Activity already shows it as such).
  */
-const MISSED_AFTER_MIN = 30;
+const MISSED_AFTER_MIN = 0;
 
 const STEPS: { key: Stage; label: string }[] = [
   { key: 'confirmed', label: 'Booked' },

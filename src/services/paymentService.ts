@@ -52,6 +52,11 @@ export interface CreateOrderPayload {
    *  for reconciliation. The actual seat reservation happens client-side
    *  after verifyPayment succeeds. */
   scheduledRouteId?: string;
+  /** Scheduled trip identity: the server rejects (422) a departure the
+   *  driver has marked unavailable before any order is created. */
+  driverId?: string;
+  departureDate?: string;
+  departureIndex?: number;
   methodPreference?: 'card' | 'upi' | 'wallet';
   /** Wallet top-up via an admin-defined recharge offer. When set, the server
    *  computes the charge + credit from the offer and ignores `amount`. */

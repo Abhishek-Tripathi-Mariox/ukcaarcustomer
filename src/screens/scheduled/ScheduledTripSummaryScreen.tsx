@@ -47,6 +47,10 @@ interface Props {
       /** Driver/vehicle the seats are on (per-vehicle validation). */
       driverId?: string;
       status?: string;
+      /** Cancelled/expired tickets from Activity: refund actually recorded
+       *  on the booking, and who cancelled ('system' = the trip didn't run). */
+      refundedAmount?: number;
+      cancelledBy?: string;
     };
   };
 }
@@ -170,11 +174,16 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
   const pricePerSeat = scheduledRoute?.price ?? 0;
   const total = params.total ?? ride?.actualFare ?? ride?.estimatedFare ?? 0;
 
+  // Activity's projected `sched_` tickets have no fetched ride, so the status
+  // they were opened with is the source of truth.
+  const tripStatus = ride?.status ?? params.status;
+  const isCancelled = tripStatus === 'cancelled';
+  const refunded = Number(params.refundedAmount ?? 0);
   const statusLabel =
-    ride?.status === 'completed'
+    tripStatus === 'completed'
       ? 'Completed trip'
-      : ride?.status === 'cancelled'
-      ? 'Cancelled'
+      : isCancelled
+      ? params.cancelledBy === 'system' ? 'Did not run' : 'Cancelled'
       : 'Upcoming trip';
   const seatLabel = seats.length > 0 ? seats.map((s) => `Seat ${s}`).join(', ') : '—';
 
@@ -358,7 +367,11 @@ export const ScheduledTripSummaryScreen: React.FC<Props> = ({ navigation, route 
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.topSubheading}>
-            {isFinished
+            {isCancelled
+              ? `This trip was ${statusLabel === 'Did not run' ? 'not run' : 'cancelled'}.${
+                  refunded > 0 ? ` ₹${Math.round(refunded)} was refunded.` : ''
+                }`
+              : isFinished
               ? 'Thanks for riding with  UKCAAR!'
               : isBookingMode
               ? `Your trip starts at ${depTime} on ${dateLabel}.`

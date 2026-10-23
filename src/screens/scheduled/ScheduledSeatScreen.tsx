@@ -279,9 +279,8 @@ export const ScheduledSeatScreen: React.FC<Props> = ({ navigation, route }) => {
       ) : totalSeats === 0 ? (
         <View style={styles.loadingWrap}>
           <Text style={styles.errorText}>
-            This route doesn't have seats configured yet. Ask the admin to
-            set <Text style={{ fontStyle: 'italic' }}>Total seats</Text> on
-            the route.
+            This vehicle has no passenger seats configured yet. Please go back
+            and choose another vehicle or departure.
           </Text>
         </View>
       ) : (
